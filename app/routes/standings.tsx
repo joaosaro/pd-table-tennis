@@ -1,8 +1,8 @@
 import { Link, useLoaderData } from "react-router";
-import type { Route } from "./+types/standings";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { calculateStandings } from "~/lib/tournament.server";
-import type { Player, MatchWithPlayers, PlayerStanding } from "~/lib/types";
+import type { MatchWithPlayers, Player } from "~/lib/types";
+import type { Route } from "./+types/standings";
 
 export function meta() {
   return [
@@ -23,11 +23,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Get all completed league matches
   const { data: matches } = await supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `)
+    `
+    )
     .eq("phase", "league")
     .eq("status", "completed");
 
@@ -74,7 +76,9 @@ export default function Standings() {
                   className={getRowClass(standing.rank)}
                 >
                   <td className="text-center rank-cell">
-                    <span className={`rank-badge ${getRankClass(standing.rank)}`}>
+                    <span
+                      className={`rank-badge ${getRankClass(standing.rank)}`}
+                    >
                       {standing.rank}
                     </span>
                   </td>
@@ -99,7 +103,9 @@ export default function Standings() {
                     {standing.setsWon}-{standing.setsLost}
                   </td>
                   <td className="text-center hide-mobile">
-                    {standing.setDiff > 0 ? `+${standing.setDiff}` : standing.setDiff}
+                    {standing.setDiff > 0
+                      ? `+${standing.setDiff}`
+                      : standing.setDiff}
                   </td>
                 </tr>
               ))}
@@ -118,7 +124,7 @@ export default function Standings() {
           <span>Knockout round</span>
         </div>
         <div className="legend-item">
-          <span className="rank-badge">11+</span>
+          <span className="rank-badge">Remaining</span>
           <span>Eliminated</span>
         </div>
       </div>

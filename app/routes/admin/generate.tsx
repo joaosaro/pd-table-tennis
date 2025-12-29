@@ -1,9 +1,19 @@
-import { Form, redirect, useLoaderData, useActionData, useNavigation, data } from "react-router";
-import type { Route } from "./+types/generate";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import {
+  data,
+  Form,
+  redirect,
+  useActionData,
+  useLoaderData,
+  useNavigation,
+} from "react-router";
 import { requireRole } from "~/lib/auth.server";
-import { calculateStandings, generateLeagueMatchPairs } from "~/lib/tournament.server";
-import type { Player, MatchWithPlayers } from "~/lib/types";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
+import {
+  calculateStandings,
+  generateLeagueMatchPairs,
+} from "~/lib/tournament.server";
+import type { MatchWithPlayers, Player } from "~/lib/types";
+import type { Route } from "./+types/generate";
 
 export function meta() {
   return [{ title: "Generate Matches | PD Table Tennis" }];
@@ -23,11 +33,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: leagueMatches } = await supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `)
+    `
+    )
     .eq("phase", "league")
     .eq("status", "completed");
 
@@ -36,12 +48,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     (leagueMatches as MatchWithPlayers[]) || []
   );
 
-  return data({
-    playerCount: players?.length || 0,
-    leagueMatchCount: leagueMatchCount || 0,
-    expectedLeagueMatches: players ? (players.length * (players.length - 1)) / 2 : 0,
-    canGenerateKnockout: standings.length >= 10,
-  }, { headers });
+  return data(
+    {
+      playerCount: players?.length || 0,
+      leagueMatchCount: leagueMatchCount || 0,
+      expectedLeagueMatches: players
+        ? (players.length * (players.length - 1)) / 2
+        : 0,
+      canGenerateKnockout: standings.length >= 10,
+    },
+    { headers }
+  );
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -65,7 +82,9 @@ export async function action({ request }: Route.ActionArgs) {
       .eq("phase", "league");
 
     if (count && count > 0) {
-      return { error: "League matches already exist. Delete them first to regenerate." };
+      return {
+        error: "League matches already exist. Delete them first to regenerate.",
+      };
     }
 
     const pairs = generateLeagueMatchPairs(players as Player[]);
@@ -92,11 +111,13 @@ export async function action({ request }: Route.ActionArgs) {
 
     const { data: leagueMatches } = await supabase
       .from("matches")
-      .select(`
+      .select(
+        `
         *,
         player1:players!matches_player1_id_fkey(*),
         player2:players!matches_player2_id_fkey(*)
-      `)
+      `
+      )
       .eq("phase", "league")
       .eq("status", "completed");
 
@@ -106,7 +127,10 @@ export async function action({ request }: Route.ActionArgs) {
     );
 
     if (standings.length < 10) {
-      return { error: "Need at least 10 players with completed matches to generate knockout" };
+      return {
+        error:
+          "Need at least 10 players with completed matches to generate knockout",
+      };
     }
 
     // Generate round 1 matches: 3v10, 4v9, 5v8, 6v7
@@ -156,8 +180,12 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function AdminGenerate() {
-  const { playerCount, leagueMatchCount, expectedLeagueMatches, canGenerateKnockout } =
-    useLoaderData<typeof loader>();
+  const {
+    playerCount,
+    leagueMatchCount,
+    expectedLeagueMatches,
+    canGenerateKnockout,
+  } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";

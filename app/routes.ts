@@ -4,7 +4,7 @@ export default [
   // Public routes
   index("routes/home.tsx"),
   route("standings", "routes/standings.tsx"),
-  route("schedule", "routes/schedule.tsx"),
+  route("results", "routes/results.tsx"),
   route("players", "routes/players.tsx"),
   route("player/:id", "routes/player.$id.tsx"),
   route("match/:id", "routes/match.$id.tsx"),

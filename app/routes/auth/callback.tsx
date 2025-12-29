@@ -10,9 +10,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Validate redirect URL to prevent open redirect attacks
   const redirectTo = redirectParam.startsWith("/") ? redirectParam : "/";
 
+  console.log("Callback received, code present:", !!code);
+
   if (code) {
     const { supabase, headers } = createSupabaseServerClient(request);
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    console.log("Exchange result:", { hasSession: !!data?.session, error });
 
     if (!error) {
       return redirect(redirectTo, { headers });

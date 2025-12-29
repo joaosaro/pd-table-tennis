@@ -9,7 +9,7 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const { headers } = await requireRole(request, ["admin"]);
+  const { headers, user: currentUser } = await requireRole(request, ["admin"]);
 
   const { supabase } = createSupabaseServerClient(request);
 
@@ -18,26 +18,41 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*")
     .order("created_at", { ascending: false });
 
-  return data({ users: (users as User[]) || [] }, { headers });
+  return data({ users: (users as User[]) || [], currentUserId: currentUser.id }, { headers });
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const { headers: authHeaders } = await requireRole(request, ["admin"]);
+  const { headers: authHeaders, user: currentUser } = await requireRole(request, ["admin"]);
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
-
+  const intent = formData.get("intent") as string;
   const userId = formData.get("user_id") as string;
-  const role = formData.get("role") as string;
 
-  if (!userId || !role) {
-    return { error: "Missing user ID or role" };
+  if (!userId) {
+    return { error: "Missing user ID" };
   }
 
-  const { error } = await supabase
-    .from("users")
-    .update({ role })
-    .eq("id", userId);
+  // Prevent self-deletion
+  if (intent === "delete" && userId === currentUser.id) {
+    return { error: "You cannot delete your own account" };
+  }
+
+  let error;
+
+  if (intent === "delete") {
+    console.log("Deleting user:", userId);
+    const result = await supabase.from("users").delete().eq("id", userId);
+    console.log("Delete result:", result);
+    error = result.error;
+  } else {
+    const role = formData.get("role") as string;
+    if (!role) {
+      return { error: "Missing role" };
+    }
+    const result = await supabase.from("users").update({ role }).eq("id", userId);
+    error = result.error;
+  }
 
   if (error) {
     return { error: error.message };
@@ -50,7 +65,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function AdminUsers() {
-  const { users } = useLoaderData<typeof loader>();
+  const { users, currentUserId } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
@@ -86,9 +101,10 @@ export default function AdminUsers() {
                   </span>
                 </td>
                 <td>{new Date(user.created_at).toLocaleDateString()}</td>
-                <td className="text-right">
+                <td className="text-right actions-cell">
                   <Form method="post" className="role-form">
                     <input type="hidden" name="user_id" value={user.id} />
+                    <input type="hidden" name="intent" value="update" />
                     <select
                       name="role"
                       defaultValue={user.role}
@@ -107,6 +123,27 @@ export default function AdminUsers() {
                       Save
                     </button>
                   </Form>
+                  {user.id !== currentUserId && (
+                    <Form
+                      method="post"
+                      className="delete-form"
+                      onSubmit={(e) => {
+                        if (!confirm(`Delete user ${user.email}?`)) {
+                          e.preventDefault();
+                        }
+                      }}
+                    >
+                      <input type="hidden" name="user_id" value={user.id} />
+                      <input type="hidden" name="intent" value="delete" />
+                      <button
+                        type="submit"
+                        className="btn btn-danger"
+                        disabled={isSubmitting}
+                      >
+                        Delete
+                      </button>
+                    </Form>
+                  )}
                 </td>
               </tr>
             ))}

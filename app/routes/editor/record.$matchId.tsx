@@ -1,8 +1,15 @@
-import { Form, redirect, useLoaderData, useActionData, useNavigation, data } from "react-router";
-import type { Route } from "./+types/record.$matchId";
+import {
+  data,
+  Form,
+  redirect,
+  useActionData,
+  useLoaderData,
+  useNavigation,
+} from "react-router";
+import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { requireRole, getUser } from "~/lib/auth.server";
 import type { MatchWithPlayers } from "~/lib/types";
+import type { Route } from "./+types/record.$matchId";
 
 export function meta({ data }: Route.MetaArgs) {
   if (!data?.match) {
@@ -22,11 +29,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: match } = await supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `)
+    `
+    )
     .eq("id", params.matchId)
     .single();
 
@@ -38,7 +47,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const { user, headers: authHeaders } = await requireRole(request, ["admin", "editor"]);
+  const { user, headers: authHeaders } = await requireRole(request, [
+    "admin",
+    "editor",
+  ]);
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
@@ -47,8 +59,12 @@ export async function action({ request, params }: Route.ActionArgs) {
   const set1_p2 = parseInt(formData.get("set1_p2") as string) || 0;
   const set2_p1 = parseInt(formData.get("set2_p1") as string) || 0;
   const set2_p2 = parseInt(formData.get("set2_p2") as string) || 0;
-  const set3_p1 = formData.get("set3_p1") ? parseInt(formData.get("set3_p1") as string) : null;
-  const set3_p2 = formData.get("set3_p2") ? parseInt(formData.get("set3_p2") as string) : null;
+  const set3_p1 = formData.get("set3_p1")
+    ? parseInt(formData.get("set3_p1") as string)
+    : null;
+  const set3_p2 = formData.get("set3_p2")
+    ? parseInt(formData.get("set3_p2") as string)
+    : null;
 
   // Calculate sets won
   let p1Sets = 0;
@@ -105,7 +121,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const allHeaders = new Headers(authHeaders);
   headers.forEach((value, key) => allHeaders.append(key, value));
-  return redirect("/schedule", { headers: allHeaders });
+  return redirect("/results", { headers: allHeaders });
 }
 
 export default function RecordMatch() {
@@ -234,7 +250,7 @@ export default function RecordMatch() {
           >
             {isSubmitting ? "Saving..." : "Save Result"}
           </button>
-          <a href="/schedule" className="btn btn-secondary">
+          <a href="/results" className="btn btn-secondary">
             Cancel
           </a>
         </div>

@@ -20,7 +20,7 @@ export function createSupabaseServerClient(request: Request) {
             const isProduction = process.env.NODE_ENV === "production";
             headers.append(
               "Set-Cookie",
-              `${name}=${value}; Path=/; HttpOnly; SameSite=Lax${isProduction ? "; Secure" : ""}${options?.maxAge ? `; Max-Age=${options.maxAge}` : ""}`
+              `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax${isProduction ? "; Secure" : ""}${options?.maxAge ? `; Max-Age=${options.maxAge}` : ""}`
             );
           });
         },
@@ -36,7 +36,11 @@ function parseCookies(cookieHeader: string): Record<string, string> {
   cookieHeader.split(";").forEach((cookie) => {
     const [name, ...rest] = cookie.split("=");
     if (name) {
-      cookies[name.trim()] = rest.join("=").trim();
+      try {
+        cookies[name.trim()] = decodeURIComponent(rest.join("=").trim());
+      } catch {
+        cookies[name.trim()] = rest.join("=").trim();
+      }
     }
   });
   return cookies;

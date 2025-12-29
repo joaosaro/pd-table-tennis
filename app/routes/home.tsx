@@ -1,7 +1,7 @@
 import { Link, useLoaderData } from "react-router";
-import type { Route } from "./+types/home";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { TournamentSettings, MatchWithPlayers } from "~/lib/types";
+import type { MatchWithPlayers, TournamentSettings } from "~/lib/types";
+import type { Route } from "./+types/home";
 
 export function meta() {
   return [
@@ -61,8 +61,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Home() {
-  const { settings, playerCount, totalMatches, completedMatches, recentMatches } =
-    useLoaderData<typeof loader>();
+  const {
+    settings,
+    playerCount,
+    totalMatches,
+    completedMatches,
+    recentMatches,
+  } = useLoaderData<typeof loader>();
 
   const progress =
     totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
@@ -104,8 +109,8 @@ export default function Home() {
           <h3>Standings</h3>
           <p>View current league rankings</p>
         </Link>
-        <Link to="/schedule" className="quick-link-card">
-          <h3>Schedule</h3>
+        <Link to="/results" className="quick-link-card">
+          <h3>Results</h3>
           <p>See all matches and results</p>
         </Link>
         <Link to="/bracket" className="quick-link-card">
@@ -145,9 +150,7 @@ export default function Home() {
                     {match.player2.name}
                   </span>
                 </div>
-                <div className="result-score">
-                  {getMatchScore(match)}
-                </div>
+                <div className="result-score">{getMatchScore(match)}</div>
               </Link>
             ))}
           </div>

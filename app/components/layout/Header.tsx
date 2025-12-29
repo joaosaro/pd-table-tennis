@@ -1,4 +1,4 @@
-import { Link, Form } from "react-router";
+import { Form, Link } from "react-router";
 import type { AppUser } from "~/lib/types";
 
 interface HeaderProps {
@@ -19,8 +19,8 @@ export function Header({ user }: HeaderProps) {
           <Link to="/standings" className="nav-link">
             Standings
           </Link>
-          <Link to="/schedule" className="nav-link">
-            Schedule
+          <Link to="/results" className="nav-link">
+            Results
           </Link>
           <Link to="/players" className="nav-link">
             Players

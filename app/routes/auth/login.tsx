@@ -1,7 +1,13 @@
-import { redirect, Form, useSearchParams, useActionData, data } from "react-router";
-import type { Route } from "./+types/login";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import {
+  data,
+  Form,
+  redirect,
+  useActionData,
+  useSearchParams,
+} from "react-router";
 import { getUser } from "~/lib/auth.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
+import type { Route } from "./+types/login";
 
 export function meta() {
   return [{ title: "Sign In | PD Table Tennis" }];
@@ -95,7 +101,7 @@ export default function Login() {
         </Form>
 
         <p className="login-note">
-          Public access allows viewing standings, schedule, and results without
+          Public access allows viewing standings, results, and results without
           signing in.
         </p>
       </div>

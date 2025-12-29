@@ -27,7 +27,11 @@ export async function getUser(
     .single();
 
   if (!appUser) {
-    // First login - create user with default viewer role
+    // First login - check if this is the first user (becomes admin)
+    // Use RPC to bypass RLS when counting users
+    const { data: countData } = await supabase.rpc("get_user_count");
+    const isFirstUser = countData === 0;
+
     const { data: newUser, error } = await supabase
       .from("users")
       .insert({
@@ -35,7 +39,7 @@ export async function getUser(
         email: user.email!,
         full_name: user.user_metadata?.full_name || null,
         avatar_url: user.user_metadata?.avatar_url || null,
-        role: "viewer",
+        role: isFirstUser ? "admin" : "viewer",
       })
       .select()
       .single();

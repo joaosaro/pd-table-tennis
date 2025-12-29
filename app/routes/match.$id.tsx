@@ -1,8 +1,8 @@
 import { Link, useLoaderData } from "react-router";
-import type { Route } from "./+types/match.$id";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type { MatchWithPlayers } from "~/lib/types";
 import { TIER_POINTS } from "~/lib/types";
+import type { Route } from "./+types/match.$id";
 
 export function meta({ data }: Route.MetaArgs) {
   if (!data?.match) {
@@ -20,11 +20,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: match } = await supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `)
+    `
+    )
     .eq("id", params.id)
     .single();
 
@@ -51,9 +53,8 @@ export default function MatchDetails() {
     match.winner_id === match.player1_id ? match.player1 : match.player2;
   const loser =
     match.winner_id === match.player1_id ? match.player2 : match.player1;
-  const pointsEarned = match.status === "completed"
-    ? TIER_POINTS[loser.tier as 1 | 2 | 3 | 4]
-    : 0;
+  const pointsEarned =
+    match.status === "completed" ? TIER_POINTS[loser.tier as 1 | 2 | 3 | 4] : 0;
 
   return (
     <main className="page">
@@ -63,7 +64,7 @@ export default function MatchDetails() {
             {formatPhase(match.phase)}
           </span>
           {match.status === "scheduled" && (
-            <span className="status-badge scheduled">Scheduled</span>
+            <span className="status-badge scheduled">Results</span>
           )}
         </div>
 
@@ -141,7 +142,8 @@ export default function MatchDetails() {
           <div className="match-summary">
             <p>
               <strong>{winner.name}</strong> won and earned{" "}
-              <strong>{pointsEarned} points</strong> (opponent tier {loser.tier})
+              <strong>{pointsEarned} points</strong> (opponent tier {loser.tier}
+              )
             </p>
           </div>
         )}

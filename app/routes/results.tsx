@@ -1,12 +1,12 @@
 import { Link, useLoaderData, useSearchParams } from "react-router";
-import type { Route } from "./+types/schedule";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type { MatchWithPlayers } from "~/lib/types";
+import type { Route } from "./+types/results";
 
 export function meta() {
   return [
-    { title: "Schedule | PD Table Tennis" },
-    { name: "description", content: "Match schedule and results" },
+    { title: "Results | PD Table Tennis" },
+    { name: "description", content: "Match results and results" },
   ];
 }
 
@@ -18,11 +18,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   let query = supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `)
+    `
+    )
     .order("created_at", { ascending: true });
 
   if (status !== "all") {
@@ -38,7 +40,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { matches: (matches as MatchWithPlayers[]) || [] };
 }
 
-export default function Schedule() {
+export default function Results() {
   const { matches } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -61,13 +63,14 @@ export default function Schedule() {
   return (
     <main className="page">
       <div className="page-header">
-        <h1>Schedule</h1>
+        <h1>Results</h1>
         <p>
-          {completedMatches.length} completed, {scheduledMatches.length} remaining
+          {completedMatches.length} completed, {scheduledMatches.length}{" "}
+          remaining
         </p>
       </div>
 
-      <div className="schedule-filters">
+      <div className="results-filters">
         <div className="filter-group">
           <label>Status:</label>
           <select
@@ -100,18 +103,16 @@ export default function Schedule() {
       {matches.length === 0 ? (
         <p className="empty">No matches found.</p>
       ) : (
-        <div className="schedule-list">
+        <div className="results-list">
           {matches.map((match) => (
             <Link
               key={match.id}
               to={`/match/${match.id}`}
-              className={`schedule-card ${match.status}`}
+              className={`results-card ${match.status}`}
             >
-              <div className="schedule-card-main">
-                <div className="schedule-player">
-                  <span
-                    className={`tier-badge tier-${match.player1.tier}`}
-                  >
+              <div className="results-card-main">
+                <div className="results-player">
+                  <span className={`tier-badge tier-${match.player1.tier}`}>
                     {match.player1.tier}
                   </span>
                   <span
@@ -122,16 +123,14 @@ export default function Schedule() {
                     {match.player1.name}
                   </span>
                 </div>
-                <div className="schedule-vs">
+                <div className="results-vs">
                   {match.status === "completed" ? (
-                    <span className="schedule-score">
-                      {getSetScore(match)}
-                    </span>
+                    <span className="results-score">{getSetScore(match)}</span>
                   ) : (
                     <span>vs</span>
                   )}
                 </div>
-                <div className="schedule-player">
+                <div className="results-player">
                   <span
                     className={
                       match.winner_id === match.player2_id ? "winner" : ""
@@ -139,19 +138,17 @@ export default function Schedule() {
                   >
                     {match.player2.name}
                   </span>
-                  <span
-                    className={`tier-badge tier-${match.player2.tier}`}
-                  >
+                  <span className={`tier-badge tier-${match.player2.tier}`}>
                     {match.player2.tier}
                   </span>
                 </div>
               </div>
-              <div className="schedule-card-meta">
+              <div className="results-card-meta">
                 <span className={`phase-badge ${match.phase}`}>
                   {formatPhase(match.phase)}
                 </span>
                 {match.status === "scheduled" && (
-                  <span className="status-badge scheduled">Scheduled</span>
+                  <span className="status-badge scheduled">Results</span>
                 )}
               </div>
             </Link>

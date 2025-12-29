@@ -1,8 +1,8 @@
-import { Link, useLoaderData, Form, data } from "react-router";
-import type { Route } from "./+types/matches";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { Form, Link, data, useLoaderData } from "react-router";
 import { requireRole } from "~/lib/auth.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type { MatchWithPlayers } from "~/lib/types";
+import type { Route } from "./+types/matches";
 
 export function meta() {
   return [{ title: "Manage Matches | PD Table Tennis" }];
@@ -15,11 +15,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: matches } = await supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `)
+    `
+    )
     .order("phase")
     .order("created_at");
 
@@ -43,10 +45,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "delete_all_knockout") {
-    await supabase
-      .from("matches")
-      .delete()
-      .neq("phase", "league");
+    await supabase.from("matches").delete().neq("phase", "league");
   }
 
   const allHeaders = new Headers(authHeaders);
