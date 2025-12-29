@@ -1,4 +1,4 @@
-import { Form, redirect, useLoaderData, useActionData, useNavigation } from "react-router";
+import { Form, redirect, useLoaderData, useActionData, useNavigation, data } from "react-router";
 import type { Route } from "./+types/record.$matchId";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { requireRole, getUser } from "~/lib/auth.server";
@@ -16,7 +16,7 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  await requireRole(request, ["admin", "editor"]);
+  const { headers } = await requireRole(request, ["admin", "editor"]);
 
   const { supabase } = createSupabaseServerClient(request);
 
@@ -34,11 +34,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Match not found", { status: 404 });
   }
 
-  return { match: match as MatchWithPlayers };
+  return data({ match: match as MatchWithPlayers }, { headers });
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const user = await requireRole(request, ["admin", "editor"]);
+  const { user, headers: authHeaders } = await requireRole(request, ["admin", "editor"]);
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
@@ -103,7 +103,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: error.message };
   }
 
-  return redirect("/schedule", { headers });
+  const allHeaders = new Headers(authHeaders);
+  headers.forEach((value, key) => allHeaders.append(key, value));
+  return redirect("/schedule", { headers: allHeaders });
 }
 
 export default function RecordMatch() {

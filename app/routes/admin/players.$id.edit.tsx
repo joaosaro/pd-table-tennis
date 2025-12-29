@@ -1,4 +1,4 @@
-import { Form, redirect, useLoaderData, useActionData, useNavigation } from "react-router";
+import { Form, redirect, useLoaderData, useActionData, useNavigation, data } from "react-router";
 import type { Route } from "./+types/players.$id.edit";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { requireRole } from "~/lib/auth.server";
@@ -9,7 +9,7 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers } = await requireRole(request, ["admin"]);
 
   const { supabase } = createSupabaseServerClient(request);
 
@@ -23,11 +23,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Player not found", { status: 404 });
   }
 
-  return { player: player as Player };
+  return data({ player: player as Player }, { headers });
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers: authHeaders } = await requireRole(request, ["admin"]);
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
@@ -49,7 +49,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: error.message };
   }
 
-  return redirect("/admin/players", { headers });
+  const allHeaders = new Headers(authHeaders);
+  headers.forEach((value, key) => allHeaders.append(key, value));
+  return redirect("/admin/players", { headers: allHeaders });
 }
 
 export default function AdminPlayersEdit() {

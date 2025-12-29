@@ -1,4 +1,4 @@
-import { Form, useLoaderData, useActionData, useNavigation } from "react-router";
+import { Form, useLoaderData, useActionData, useNavigation, data } from "react-router";
 import type { Route } from "./+types/settings";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { requireRole } from "~/lib/auth.server";
@@ -9,7 +9,7 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers } = await requireRole(request, ["admin"]);
 
   const { supabase } = createSupabaseServerClient(request);
 
@@ -18,11 +18,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*")
     .single();
 
-  return { settings: settings as TournamentSettings | null };
+  return data({ settings: settings as TournamentSettings | null }, { headers });
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers: authHeaders } = await requireRole(request, ["admin"]);
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
@@ -41,10 +41,10 @@ export async function action({ request }: Route.ActionArgs) {
     .eq("id", 1);
 
   if (error) {
-    return { error: error.message };
+    return data({ error: error.message }, { headers: authHeaders });
   }
 
-  return { success: true };
+  return data({ success: true }, { headers: authHeaders });
 }
 
 export default function AdminSettings() {
@@ -58,10 +58,10 @@ export default function AdminSettings() {
       <h1>Tournament Settings</h1>
 
       <Form method="post" className="admin-form">
-        {actionData?.error && (
-          <div className="error-message">{actionData.error}</div>
+        {"error" in (actionData || {}) && (
+          <div className="error-message">{(actionData as { error: string }).error}</div>
         )}
-        {actionData?.success && (
+        {"success" in (actionData || {}) && (
           <div className="success-message">Settings saved successfully!</div>
         )}
 

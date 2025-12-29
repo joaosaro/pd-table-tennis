@@ -1,4 +1,4 @@
-import { Link, useLoaderData } from "react-router";
+import { Link, useLoaderData, data } from "react-router";
 import type { Route } from "./+types/index";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { requireRole } from "~/lib/auth.server";
@@ -8,7 +8,7 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers } = await requireRole(request, ["admin"]);
 
   const { supabase } = createSupabaseServerClient(request);
 
@@ -29,12 +29,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     .from("users")
     .select("*", { count: "exact", head: true });
 
-  return {
+  return data({
     playerCount: playerCount || 0,
     totalMatches: totalMatches || 0,
     completedMatches: completedMatches || 0,
     userCount: userCount || 0,
-  };
+  }, { headers });
 }
 
 export default function AdminIndex() {

@@ -1,4 +1,4 @@
-import { Link, useLoaderData, Form } from "react-router";
+import { Link, useLoaderData, Form, data } from "react-router";
 import type { Route } from "./+types/players";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { requireRole } from "~/lib/auth.server";
@@ -9,7 +9,7 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers } = await requireRole(request, ["admin"]);
 
   const { supabase } = createSupabaseServerClient(request);
 
@@ -18,11 +18,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*")
     .order("name");
 
-  return { players: (players as Player[]) || [] };
+  return data({ players: (players as Player[]) || [] }, { headers });
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers: authHeaders } = await requireRole(request, ["admin"]);
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
@@ -33,10 +33,10 @@ export async function action({ request }: Route.ActionArgs) {
     await supabase.from("players").delete().eq("id", id);
   }
 
-  return new Response(null, {
-    status: 302,
-    headers: { ...Object.fromEntries(headers), Location: "/admin/players" },
-  });
+  const allHeaders = new Headers(authHeaders);
+  headers.forEach((value, key) => allHeaders.append(key, value));
+  allHeaders.set("Location", "/admin/players");
+  return new Response(null, { status: 302, headers: allHeaders });
 }
 
 export default function AdminPlayers() {

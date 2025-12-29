@@ -1,4 +1,4 @@
-import { Form, redirect, useLoaderData, useActionData, useNavigation } from "react-router";
+import { Form, redirect, useLoaderData, useActionData, useNavigation, data } from "react-router";
 import type { Route } from "./+types/generate";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { requireRole } from "~/lib/auth.server";
@@ -10,7 +10,7 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers } = await requireRole(request, ["admin"]);
 
   const { supabase } = createSupabaseServerClient(request);
 
@@ -36,16 +36,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     (leagueMatches as MatchWithPlayers[]) || []
   );
 
-  return {
+  return data({
     playerCount: players?.length || 0,
     leagueMatchCount: leagueMatchCount || 0,
     expectedLeagueMatches: players ? (players.length * (players.length - 1)) / 2 : 0,
     canGenerateKnockout: standings.length >= 10,
-  };
+  }, { headers });
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireRole(request, ["admin"]);
+  const { headers: authHeaders } = await requireRole(request, ["admin"]);
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
@@ -82,7 +82,9 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: error.message };
     }
 
-    return redirect("/admin/matches", { headers });
+    const allHeaders = new Headers(authHeaders);
+    headers.forEach((value, key) => allHeaders.append(key, value));
+    return redirect("/admin/matches", { headers: allHeaders });
   }
 
   if (intent === "generate_knockout") {
@@ -145,7 +147,9 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: error.message };
     }
 
-    return redirect("/admin/matches", { headers });
+    const allHeaders = new Headers(authHeaders);
+    headers.forEach((value, key) => allHeaders.append(key, value));
+    return redirect("/admin/matches", { headers: allHeaders });
   }
 
   return { error: "Unknown action" };

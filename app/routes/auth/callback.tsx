@@ -5,7 +5,10 @@ import { createSupabaseServerClient } from "~/lib/supabase.server";
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const redirectTo = url.searchParams.get("redirect") || "/";
+  const redirectParam = url.searchParams.get("redirect") || "/";
+
+  // Validate redirect URL to prevent open redirect attacks
+  const redirectTo = redirectParam.startsWith("/") ? redirectParam : "/";
 
   if (code) {
     const { supabase, headers } = createSupabaseServerClient(request);

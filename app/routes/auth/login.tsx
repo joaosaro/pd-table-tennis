@@ -1,4 +1,4 @@
-import { redirect, Form, useSearchParams, useActionData } from "react-router";
+import { redirect, Form, useSearchParams, useActionData, data } from "react-router";
 import type { Route } from "./+types/login";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { getUser } from "~/lib/auth.server";
@@ -8,15 +8,15 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await getUser(request);
+  const { user, headers } = await getUser(request);
 
   if (user) {
     const url = new URL(request.url);
     const redirectTo = url.searchParams.get("redirect") || "/";
-    throw redirect(redirectTo);
+    throw redirect(redirectTo, { headers });
   }
 
-  return {};
+  return data({}, { headers });
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -28,6 +28,7 @@ export async function action({ request }: Route.ActionArgs) {
     provider: "google",
     options: {
       redirectTo: `${url.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
+      scopes: "email profile",
     },
   });
 

@@ -4,17 +4,19 @@ import type { AppUser, UserRole } from "./types";
 
 /**
  * Get the current authenticated user from the request.
- * Returns null if not authenticated.
+ * Returns null if not authenticated, along with headers for cookie updates.
  */
-export async function getUser(request: Request): Promise<AppUser | null> {
-  const { supabase } = createSupabaseServerClient(request);
+export async function getUser(
+  request: Request
+): Promise<{ user: AppUser | null; headers: Headers }> {
+  const { supabase, headers } = createSupabaseServerClient(request);
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return null;
+    return { user: null, headers };
   }
 
   // Try to get app user from users table
@@ -40,41 +42,49 @@ export async function getUser(request: Request): Promise<AppUser | null> {
 
     if (error || !newUser) {
       console.error("Failed to create user:", error);
-      return null;
+      return { user: null, headers };
     }
 
     return {
-      id: newUser.id,
-      email: newUser.email,
-      fullName: newUser.full_name,
-      avatarUrl: newUser.avatar_url,
-      role: newUser.role as UserRole,
-      playerId: newUser.player_id,
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        fullName: newUser.full_name,
+        avatarUrl: newUser.avatar_url,
+        role: newUser.role as UserRole,
+        playerId: newUser.player_id,
+      },
+      headers,
     };
   }
 
   return {
-    id: appUser.id,
-    email: appUser.email,
-    fullName: appUser.full_name,
-    avatarUrl: appUser.avatar_url,
-    role: appUser.role as UserRole,
-    playerId: appUser.player_id,
+    user: {
+      id: appUser.id,
+      email: appUser.email,
+      fullName: appUser.full_name,
+      avatarUrl: appUser.avatar_url,
+      role: appUser.role as UserRole,
+      playerId: appUser.player_id,
+    },
+    headers,
   };
 }
 
 /**
  * Require an authenticated user. Redirects to login if not authenticated.
  */
-export async function requireUser(request: Request): Promise<AppUser> {
-  const user = await getUser(request);
+export async function requireUser(
+  request: Request
+): Promise<{ user: AppUser; headers: Headers }> {
+  const { user, headers } = await getUser(request);
 
   if (!user) {
     const url = new URL(request.url);
     throw redirect(`/login?redirect=${encodeURIComponent(url.pathname)}`);
   }
 
-  return user;
+  return { user, headers };
 }
 
 /**
@@ -84,14 +94,14 @@ export async function requireUser(request: Request): Promise<AppUser> {
 export async function requireRole(
   request: Request,
   allowedRoles: UserRole[]
-): Promise<AppUser> {
-  const user = await requireUser(request);
+): Promise<{ user: AppUser; headers: Headers }> {
+  const { user, headers } = await requireUser(request);
 
   if (!allowedRoles.includes(user.role)) {
     throw new Response("Forbidden", { status: 403 });
   }
 
-  return user;
+  return { user, headers };
 }
 
 /**

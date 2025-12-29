@@ -6,6 +6,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  data,
 } from "react-router";
 
 import type { Route } from "./+types/root";
@@ -27,8 +28,8 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await getUser(request);
-  return { user };
+  const { user, headers } = await getUser(request);
+  return data({ user }, { headers });
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
