@@ -183,6 +183,15 @@ body {
   margin-bottom: 1rem;
 }
 
+.demo-badge {
+  background-color: #fef3c7;
+  color: #92400e;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
 .add-form {
   display: flex;
   gap: 0.5rem;
