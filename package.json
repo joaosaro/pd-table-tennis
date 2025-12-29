@@ -11,6 +11,8 @@
   "dependencies": {
     "@react-router/node": "7.10.1",
     "@react-router/serve": "7.10.1",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.89.0",
     "isbot": "^5.1.31",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
