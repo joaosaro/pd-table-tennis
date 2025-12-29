@@ -30,10 +30,17 @@ export async function action({ request }: Route.ActionArgs) {
   const url = new URL(request.url);
   const redirectTo = url.searchParams.get("redirect") || "/";
 
+  // Get the correct origin for production (Vercel) vs development
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
+  const origin = forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : url.origin;
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${url.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
+      redirectTo: `${origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
       scopes: "email profile",
     },
   });
