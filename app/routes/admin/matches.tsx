@@ -48,6 +48,10 @@ export async function action({ request }: Route.ActionArgs) {
     await supabase.from("matches").delete().neq("phase", "league");
   }
 
+  if (intent === "reset_tournament") {
+    await supabase.from("matches").delete().neq("id", "");
+  }
+
   const allHeaders = new Headers(authHeaders);
   headers.forEach((value, key) => allHeaders.append(key, value));
   allHeaders.set("Location", "/admin/matches");
@@ -64,9 +68,32 @@ export default function AdminMatches() {
     <div className="admin-page">
       <div className="admin-page-header">
         <h1>Manage Matches</h1>
-        <Link to="/admin/generate" className="btn btn-primary">
-          Generate Matches
-        </Link>
+        <div className="header-actions">
+          <Link to="/admin/generate" className="btn btn-primary">
+            Generate Matches
+          </Link>
+          {matches.length > 0 && (
+            <Form method="post" style={{ display: "inline" }}>
+              <button
+                type="submit"
+                name="intent"
+                value="reset_tournament"
+                className="btn btn-danger"
+                onClick={(e) => {
+                  if (
+                    !confirm(
+                      "Are you sure you want to reset the tournament? This will delete ALL matches (league and knockout) and cannot be undone."
+                    )
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                Reset Tournament
+              </button>
+            </Form>
+          )}
+        </div>
       </div>
 
       <section className="admin-section">

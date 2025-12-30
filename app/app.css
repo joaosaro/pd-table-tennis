@@ -1951,6 +1951,11 @@ body {
   margin: 0;
 }
 
+.admin-page-header .header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .admin-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
