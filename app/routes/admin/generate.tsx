@@ -31,6 +31,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*", { count: "exact", head: true })
     .eq("phase", "league");
 
+  const { count: knockoutMatchCount } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .neq("phase", "league");
+
   const { data: leagueMatches } = await supabase
     .from("matches")
     .select(
@@ -52,10 +57,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     {
       playerCount: players?.length || 0,
       leagueMatchCount: leagueMatchCount || 0,
+      knockoutMatchCount: knockoutMatchCount || 0,
       expectedLeagueMatches: players
         ? (players.length * (players.length - 1)) / 2
         : 0,
-      canGenerateKnockout: standings.length >= 10,
+      canGenerateKnockout: standings.length >= 10 && (knockoutMatchCount || 0) === 0,
     },
     { headers }
   );
@@ -107,6 +113,18 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "generate_knockout") {
+    // Check if knockout matches already exist
+    const { count: existingKnockout } = await supabase
+      .from("matches")
+      .select("*", { count: "exact", head: true })
+      .neq("phase", "league");
+
+    if (existingKnockout && existingKnockout > 0) {
+      return {
+        error: "Knockout matches already exist. Delete them first to regenerate.",
+      };
+    }
+
     const { data: players } = await supabase.from("players").select("*");
 
     const { data: leagueMatches } = await supabase
@@ -183,6 +201,7 @@ export default function AdminGenerate() {
   const {
     playerCount,
     leagueMatchCount,
+    knockoutMatchCount,
     expectedLeagueMatches,
     canGenerateKnockout,
   } = useLoaderData<typeof loader>();
@@ -247,7 +266,12 @@ export default function AdminGenerate() {
               {isSubmitting ? "Generating..." : "Generate Knockout R1"}
             </button>
           </Form>
-          {!canGenerateKnockout && (
+          {knockoutMatchCount > 0 && (
+            <p className="help-text">
+              Knockout matches already exist. Go to Matches page to manage them.
+            </p>
+          )}
+          {knockoutMatchCount === 0 && !canGenerateKnockout && (
             <p className="help-text">
               Need at least 10 players with completed league matches.
             </p>

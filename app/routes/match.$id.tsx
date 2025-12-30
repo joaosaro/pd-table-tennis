@@ -152,11 +152,20 @@ export default function MatchDetails() {
 
         {match.status === "completed" && (
           <div className="match-summary">
-            <p>
-              <strong>{winner.name}</strong> won and earned{" "}
-              <strong>{pointsEarned} points</strong> (opponent tier {loser.tier}
-              )
-            </p>
+            {match.phase === "league" ? (
+              <p>
+                <strong>{winner.name}</strong> won and earned{" "}
+                <strong>{pointsEarned} points</strong> (opponent tier{" "}
+                {loser.tier})
+              </p>
+            ) : (
+              <p>
+                <strong>{winner.name}</strong> won
+                {match.phase === "final"
+                  ? " the tournament!"
+                  : " and advances to the next round"}
+              </p>
+            )}
           </div>
         )}
 

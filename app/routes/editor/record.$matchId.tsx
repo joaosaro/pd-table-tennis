@@ -8,7 +8,11 @@ import {
 } from "react-router";
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { MatchWithPlayers } from "~/lib/types";
+import {
+  calculateStandings,
+  getKnockoutRoundUpdates,
+} from "~/lib/tournament.server";
+import type { Match, MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/record.$matchId";
 
 export function meta({ data }: Route.MetaArgs) {
@@ -86,10 +90,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: "Match must have a winner (best of 3 sets)" };
   }
 
-  // Get the match to determine winner
+  // Get the match to determine winner and phase
   const { data: match } = await supabase
     .from("matches")
-    .select("player1_id, player2_id")
+    .select("player1_id, player2_id, phase")
     .eq("id", params.matchId)
     .single();
 
@@ -117,6 +121,70 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Check if this was a knockout match and generate next round if needed
+  if (match.phase !== "league") {
+    // Get all knockout matches to check progression
+    const { data: knockoutMatches } = await supabase
+      .from("matches")
+      .select("*")
+      .neq("phase", "league");
+
+    // Ensure the current match is updated in the array (in case of read-after-write delay)
+    const updatedKnockoutMatches = (knockoutMatches || []).map((m) =>
+      m.id === params.matchId
+        ? { ...m, status: "completed", winner_id: winnerId }
+        : m
+    );
+
+    // Get standings for seeding
+    const { data: players } = await supabase.from("players").select("*");
+    const { data: leagueMatches } = await supabase
+      .from("matches")
+      .select(
+        `
+        *,
+        player1:players!matches_player1_id_fkey(*),
+        player2:players!matches_player2_id_fkey(*)
+      `
+      )
+      .eq("phase", "league")
+      .eq("status", "completed");
+
+    const standings = calculateStandings(
+      (players as Player[]) || [],
+      (leagueMatches as MatchWithPlayers[]) || []
+    );
+
+    // Check if we need to create or update next round matches
+    const roundUpdates = getKnockoutRoundUpdates(
+      updatedKnockoutMatches as Match[],
+      standings
+    );
+
+    // Delete stale scheduled matches first
+    if (roundUpdates.deletes.length > 0) {
+      const { error: deleteError } = await supabase
+        .from("matches")
+        .delete()
+        .in("id", roundUpdates.deletes);
+
+      if (deleteError) {
+        console.error("Failed to delete stale knockout matches:", deleteError);
+      }
+    }
+
+    // Insert new/updated matches
+    if (roundUpdates.inserts.length > 0) {
+      const { error: insertError } = await supabase
+        .from("matches")
+        .insert(roundUpdates.inserts);
+
+      if (insertError) {
+        console.error("Failed to generate next knockout round:", insertError);
+      }
+    }
   }
 
   const allHeaders = new Headers(authHeaders);

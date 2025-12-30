@@ -161,16 +161,14 @@ export default function Bracket() {
               ))
             ) : (
               <div className="bracket-matchups">
-                <div className="bracket-match-card pending">
-                  <span>1st Seed ({qualified[0]?.player.name})</span>
-                  <span className="vs">vs</span>
-                  <span>R2 Winner</span>
-                </div>
-                <div className="bracket-match-card pending">
-                  <span>2nd Seed ({qualified[1]?.player.name})</span>
-                  <span className="vs">vs</span>
-                  <span>R2 Winner</span>
-                </div>
+                <SemifinalPreview
+                  byePlayer={qualified[0]}
+                  r2WinnerLabel="R2 Winner"
+                />
+                <SemifinalPreview
+                  byePlayer={qualified[1]}
+                  r2WinnerLabel="R2 Winner"
+                />
               </div>
             )}
           </div>
@@ -256,6 +254,30 @@ function BracketPreview({
       <div className="bracket-player">
         <span className="rank-badge rank-knockout">{seed2}</span>
         <span>{player2?.player.name || "TBD"}</span>
+      </div>
+    </div>
+  );
+}
+
+function SemifinalPreview({
+  byePlayer,
+  r2WinnerLabel,
+}: {
+  byePlayer: PlayerStanding;
+  r2WinnerLabel: string;
+}) {
+  return (
+    <div className="bracket-match-card pending">
+      <div className="bracket-player">
+        <span className="rank-badge rank-semifinal">{byePlayer?.rank}</span>
+        <span className={`tier-badge tier-${byePlayer?.player.tier}`}>
+          {byePlayer?.player.tier}
+        </span>
+        <span>{byePlayer?.player.name || "TBD"}</span>
+      </div>
+      <div className="bracket-player">
+        <span className="rank-badge rank-knockout">?</span>
+        <span>{r2WinnerLabel}</span>
       </div>
     </div>
   );

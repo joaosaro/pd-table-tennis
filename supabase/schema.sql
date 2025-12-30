@@ -118,9 +118,9 @@ CREATE POLICY "Allow insert on first login" ON users
 CREATE POLICY "Anyone can view matches" ON matches
   FOR SELECT USING (true);
 
-CREATE POLICY "Admins can insert matches" ON matches
+CREATE POLICY "Editors and admins can insert matches" ON matches
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
   );
 
 CREATE POLICY "Editors and admins can update matches" ON matches
@@ -128,9 +128,9 @@ CREATE POLICY "Editors and admins can update matches" ON matches
     EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
   );
 
-CREATE POLICY "Admins can delete matches" ON matches
+CREATE POLICY "Editors and admins can delete matches" ON matches
   FOR DELETE USING (
-    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
   );
 
 -- Tournament settings: Public read, Admin write

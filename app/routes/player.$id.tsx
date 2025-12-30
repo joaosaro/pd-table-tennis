@@ -70,7 +70,10 @@ function calculatePlayerStats(player: Player, matches: MatchWithPlayers[]): Play
 
     if (won) {
       wins++;
-      points += TIER_POINTS[opponent.tier as 1|2|3|4];
+      // Only count points for league matches
+      if (match.phase === "league") {
+        points += TIER_POINTS[opponent.tier as 1|2|3|4];
+      }
     } else {
       losses++;
     }
@@ -183,7 +186,7 @@ export default function PlayerProfile() {
                     </span>
                   </div>
                   <div className="match-score">{score}</div>
-                  {won && (
+                  {won && match.phase === "league" && (
                     <div className="match-points">
                       +{TIER_POINTS[opponent.tier as 1|2|3|4]} pts
                     </div>

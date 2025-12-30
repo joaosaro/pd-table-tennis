@@ -1414,7 +1414,10 @@ body {
 }
 
 .points-cell {
-  font-weight: 600;
+  font-weight: 700;
+  background: rgba(59, 130, 246, 0.15);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
 }
 
 .standings-legend {
@@ -1543,8 +1546,11 @@ body {
 
 .results-score {
   font-weight: 600;
-  font-size: 1.125rem;
-  color: inherit;
+  font-size: 1rem;
+  color: white;
+  background: var(--color-blue-500);
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
 }
 
 .results-card-meta {

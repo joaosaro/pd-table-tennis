@@ -221,3 +221,278 @@ export function generateRound2Matchups(
     [sorted[1], sorted[2]], // Second best vs third best
   ];
 }
+
+/**
+ * Knockout phase progression configuration
+ */
+interface KnockoutProgression {
+  currentPhase: string;
+  nextPhase: string;
+  expectedMatches: number;
+}
+
+const KNOCKOUT_PROGRESSION: KnockoutProgression[] = [
+  { currentPhase: "knockout_r1", nextPhase: "knockout_r2", expectedMatches: 4 },
+  { currentPhase: "knockout_r2", nextPhase: "semifinal", expectedMatches: 2 },
+  { currentPhase: "semifinal", nextPhase: "final", expectedMatches: 2 },
+];
+
+/**
+ * Update or create next knockout round based on current results.
+ * Returns operations to perform: deletes for stale matches, inserts for new/updated ones.
+ * Uses delete+insert instead of update for consistency across all stages.
+ */
+export function getKnockoutRoundUpdates(
+  allKnockoutMatches: Match[],
+  standings: PlayerStanding[]
+): {
+  inserts: { player1_id: string; player2_id: string; phase: string; status: string }[];
+  deletes: string[]; // Match IDs to delete
+} {
+  const result: {
+    inserts: { player1_id: string; player2_id: string; phase: string; status: string }[];
+    deletes: string[];
+  } = { inserts: [], deletes: [] };
+
+  for (const progression of KNOCKOUT_PROGRESSION) {
+    const phaseMatches = allKnockoutMatches.filter(
+      (m) => m.phase === progression.currentPhase
+    );
+
+    // Check if we have all expected matches and all are completed
+    if (phaseMatches.length !== progression.expectedMatches) {
+      continue;
+    }
+
+    const allCompleted = phaseMatches.every((m) => m.status === "completed");
+    if (!allCompleted) {
+      continue;
+    }
+
+    // Get winners from completed phase
+    const winners = phaseMatches
+      .map((m) => m.winner_id!)
+      .filter((id) => id !== null);
+
+    if (winners.length !== progression.expectedMatches) {
+      continue;
+    }
+
+    // Generate the expected next round matchups
+    const expectedMatchups = generateNextRoundMatchups(
+      progression.nextPhase,
+      winners,
+      standings
+    );
+
+    if (!expectedMatchups) continue;
+
+    // Check if next phase already exists
+    const nextPhaseMatches = allKnockoutMatches.filter(
+      (m) => m.phase === progression.nextPhase
+    );
+
+    // Get scheduled matches that might need to be replaced
+    const scheduledMatches = nextPhaseMatches.filter(m => m.status === "scheduled");
+
+    // Helper to check if a matchup already exists in nextPhaseMatches (scheduled OR completed)
+    const matchupExists = (matchup: { player1_id: string; player2_id: string }) =>
+      nextPhaseMatches.some(existing =>
+        (existing.player1_id === matchup.player1_id && existing.player2_id === matchup.player2_id) ||
+        (existing.player1_id === matchup.player2_id && existing.player2_id === matchup.player1_id)
+      );
+
+    // Find scheduled matches that don't match any expected matchup (stale matches)
+    const staleScheduledMatches = scheduledMatches.filter(existing =>
+      !expectedMatchups.some(expected =>
+        (existing.player1_id === expected.player1_id && existing.player2_id === expected.player2_id) ||
+        (existing.player1_id === expected.player2_id && existing.player2_id === expected.player1_id)
+      )
+    );
+
+    // Find expected matchups that don't exist yet (need to be created)
+    const missingMatchups = expectedMatchups.filter(expected => !matchupExists(expected));
+
+    // Delete stale scheduled matches (wrong players due to edited results)
+    if (staleScheduledMatches.length > 0) {
+      result.deletes.push(...staleScheduledMatches.map(m => m.id));
+    }
+
+    // Insert missing matchups
+    if (missingMatchups.length > 0) {
+      result.inserts.push(...missingMatchups.map(m => ({
+        player1_id: m.player1_id,
+        player2_id: m.player2_id,
+        phase: progression.nextPhase,
+        status: "scheduled",
+      })));
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Generate matchups for a given knockout phase based on winners.
+ */
+function generateNextRoundMatchups(
+  phase: string,
+  winners: string[],
+  standings: PlayerStanding[]
+): { player1_id: string; player2_id: string }[] | null {
+  if (phase === "knockout_r2") {
+    // Round 2: Reseed winners by their original league rank
+    const winnerStandings = winners
+      .map((id) => standings.find((s) => s.player.id === id)!)
+      .filter((s) => s !== undefined)
+      .sort((a, b) => a.rank - b.rank);
+
+    if (winnerStandings.length !== 4) return null;
+
+    return [
+      { player1_id: winnerStandings[0].player.id, player2_id: winnerStandings[3].player.id },
+      { player1_id: winnerStandings[1].player.id, player2_id: winnerStandings[2].player.id },
+    ];
+  }
+
+  if (phase === "semifinal") {
+    // Semifinals: 1st seed vs worse R2 winner, 2nd seed vs better R2 winner
+    const byePlayers = standings.slice(0, 2);
+    const r2Winners = winners
+      .map((id) => standings.find((s) => s.player.id === id)!)
+      .filter((s) => s !== undefined)
+      .sort((a, b) => a.rank - b.rank);
+
+    if (r2Winners.length !== 2 || byePlayers.length !== 2) return null;
+
+    return [
+      { player1_id: byePlayers[0].player.id, player2_id: r2Winners[1].player.id },
+      { player1_id: byePlayers[1].player.id, player2_id: r2Winners[0].player.id },
+    ];
+  }
+
+  if (phase === "final") {
+    if (winners.length !== 2) return null;
+    return [{ player1_id: winners[0], player2_id: winners[1] }];
+  }
+
+  return null;
+}
+
+/**
+ * Check if all matches in a knockout phase are complete and generate next round.
+ * Returns the matches to insert for the next round, or null if not ready.
+ * @deprecated Use getKnockoutRoundUpdates instead
+ */
+export function getNextKnockoutRoundMatches(
+  allKnockoutMatches: Match[],
+  standings: PlayerStanding[]
+): { phase: string; matches: { player1_id: string; player2_id: string; phase: string; status: string }[] } | null {
+  for (const progression of KNOCKOUT_PROGRESSION) {
+    const phaseMatches = allKnockoutMatches.filter(
+      (m) => m.phase === progression.currentPhase
+    );
+
+    // Check if we have all expected matches and all are completed
+    if (phaseMatches.length !== progression.expectedMatches) {
+      continue;
+    }
+
+    const allCompleted = phaseMatches.every((m) => m.status === "completed");
+    if (!allCompleted) {
+      continue;
+    }
+
+    // Check if next phase already exists
+    const nextPhaseExists = allKnockoutMatches.some(
+      (m) => m.phase === progression.nextPhase
+    );
+    if (nextPhaseExists) {
+      continue;
+    }
+
+    // Get winners from completed phase
+    const winners = phaseMatches
+      .map((m) => m.winner_id!)
+      .filter((id) => id !== null);
+
+    if (winners.length !== progression.expectedMatches) {
+      continue;
+    }
+
+    // Generate next round matches based on phase
+    if (progression.nextPhase === "knockout_r2") {
+      // Round 2: Reseed winners by their original league rank
+      const winnerStandings = winners
+        .map((id) => standings.find((s) => s.player.id === id)!)
+        .filter((s) => s !== undefined)
+        .sort((a, b) => a.rank - b.rank);
+
+      if (winnerStandings.length !== 4) continue;
+
+      return {
+        phase: "knockout_r2",
+        matches: [
+          {
+            player1_id: winnerStandings[0].player.id, // Best seed
+            player2_id: winnerStandings[3].player.id, // Worst seed
+            phase: "knockout_r2",
+            status: "scheduled",
+          },
+          {
+            player1_id: winnerStandings[1].player.id, // 2nd best
+            player2_id: winnerStandings[2].player.id, // 3rd best
+            phase: "knockout_r2",
+            status: "scheduled",
+          },
+        ],
+      };
+    }
+
+    if (progression.nextPhase === "semifinal") {
+      // Semifinals: 1st seed vs worse R2 winner, 2nd seed vs better R2 winner
+      const byePlayers = standings.slice(0, 2); // 1st and 2nd from league
+      const r2Winners = winners
+        .map((id) => standings.find((s) => s.player.id === id)!)
+        .filter((s) => s !== undefined)
+        .sort((a, b) => a.rank - b.rank);
+
+      if (r2Winners.length !== 2 || byePlayers.length !== 2) continue;
+
+      return {
+        phase: "semifinal",
+        matches: [
+          {
+            player1_id: byePlayers[0].player.id, // 1st seed
+            player2_id: r2Winners[1].player.id, // Worse R2 winner
+            phase: "semifinal",
+            status: "scheduled",
+          },
+          {
+            player1_id: byePlayers[1].player.id, // 2nd seed
+            player2_id: r2Winners[0].player.id, // Better R2 winner
+            phase: "semifinal",
+            status: "scheduled",
+          },
+        ],
+      };
+    }
+
+    if (progression.nextPhase === "final") {
+      // Final: Both semifinal winners
+      return {
+        phase: "final",
+        matches: [
+          {
+            player1_id: winners[0],
+            player2_id: winners[1],
+            phase: "final",
+            status: "scheduled",
+          },
+        ],
+      };
+    }
+  }
+
+  return null;
+}
