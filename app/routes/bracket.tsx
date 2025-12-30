@@ -81,6 +81,14 @@ export default function Bracket() {
     );
   }
 
+  // Organize matches by bracket path using knockout_position
+  const topBracketR1 = round1.filter((m) => m.knockout_position === 1 || m.knockout_position === 2);
+  const bottomBracketR1 = round1.filter((m) => m.knockout_position === 3 || m.knockout_position === 4);
+  const topBracketR2 = round2.find((m) => m.knockout_position === 1);
+  const bottomBracketR2 = round2.find((m) => m.knockout_position === 2);
+  const topSemifinal = semifinals.find((m) => m.knockout_position === 1);
+  const bottomSemifinal = semifinals.find((m) => m.knockout_position === 2);
+
   return (
     <main className="page">
       <div className="page-header">
@@ -88,104 +96,148 @@ export default function Bracket() {
         <p>Top 2 from league go directly to semifinals. 3rd-10th play knockout rounds.</p>
       </div>
 
-      <div className="bracket-container">
-        {/* Bye players */}
-        <div className="bracket-section">
-          <h3>Direct to Semifinals</h3>
-          <div className="bye-players">
-            {qualified.slice(0, 2).map((s) => (
-              <Link
-                key={s.player.id}
-                to={`/player/${s.player.id}`}
-                className="bye-player-card"
-              >
-                <span className="rank-badge rank-semifinal">{s.rank}</span>
-                <span className="bye-player-name">{s.player.name}</span>
-                <span className="bye-player-points">{s.points} pts</span>
-              </Link>
-            ))}
+      <div className="bracket-dual">
+        {/* Top Bracket */}
+        <div className="bracket-half">
+          <div className="bracket-half-header">
+            <h3>Top Bracket</h3>
+            <Link to={`/player/${qualified[0]?.player.id}`} className="bye-player-inline">
+              <span className="rank-badge rank-semifinal">1</span>
+              <span>{qualified[0]?.player.name}</span>
+              <span className="bye-label">→ Semi</span>
+            </Link>
           </div>
-        </div>
 
-        {/* Round 1 */}
-        <div className="bracket-section">
-          <h3>Round 1 (Knockout)</h3>
-          <div className="bracket-round">
-            {round1.length > 0 ? (
-              round1.map((match) => (
-                <BracketMatch key={match.id} match={match} />
-              ))
-            ) : (
-              <div className="bracket-matchups">
-                <BracketPreview seed1={3} seed2={10} qualified={qualified} />
-                <BracketPreview seed1={4} seed2={9} qualified={qualified} />
-                <BracketPreview seed1={5} seed2={8} qualified={qualified} />
-                <BracketPreview seed1={6} seed2={7} qualified={qualified} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Round 2 */}
-        <div className="bracket-section">
-          <h3>Round 2</h3>
-          <div className="bracket-round">
-            {round2.length > 0 ? (
-              round2.map((match) => (
-                <BracketMatch key={match.id} match={match} />
-              ))
-            ) : (
-              <div className="bracket-matchups">
-                <div className="bracket-match-card pending">
-                  <span>Winner of R1</span>
-                  <span className="vs">vs</span>
-                  <span>Winner of R1</span>
-                </div>
-                <div className="bracket-match-card pending">
-                  <span>Winner of R1</span>
-                  <span className="vs">vs</span>
-                  <span>Winner of R1</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Semifinals */}
-        <div className="bracket-section">
-          <h3>Semifinals</h3>
-          <div className="bracket-round">
-            {semifinals.length > 0 ? (
-              semifinals.map((match) => (
-                <BracketMatch key={match.id} match={match} />
-              ))
-            ) : (
-              <div className="bracket-matchups">
-                <SemifinalPreview
-                  byePlayer={qualified[0]}
-                  r2WinnerLabel="R2 Winner"
-                />
-                <SemifinalPreview
-                  byePlayer={qualified[1]}
-                  r2WinnerLabel="R2 Winner"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Final */}
-        <div className="bracket-section">
-          <h3>Final</h3>
-          {final ? (
-            <BracketMatch match={final} isFinal />
-          ) : (
-            <div className="bracket-match-card pending final">
-              <span>Semifinal Winner</span>
-              <span className="vs">vs</span>
-              <span>Semifinal Winner</span>
+          <div className="bracket-tree">
+            {/* R1 */}
+            <div className="bracket-column">
+              <div className="bracket-column-label">Round 1</div>
+              {topBracketR1.length > 0 ? (
+                topBracketR1
+                  .sort((a, b) => (a.knockout_position || 0) - (b.knockout_position || 0))
+                  .map((match) => <BracketMatch key={match.id} match={match} />)
+              ) : (
+                <>
+                  <BracketPreview seed1={3} seed2={10} qualified={qualified} />
+                  <BracketPreview seed1={4} seed2={9} qualified={qualified} />
+                </>
+              )}
             </div>
-          )}
+
+            {/* R2 */}
+            <div className="bracket-column">
+              <div className="bracket-column-label">Round 2</div>
+              {topBracketR2 ? (
+                <BracketMatch match={topBracketR2} />
+              ) : (
+                <div className="bracket-match-card pending">
+                  <div className="bracket-player">
+                    <span className="rank-badge rank-knockout">?</span>
+                    <span>Winner 3v10</span>
+                  </div>
+                  <div className="bracket-player">
+                    <span className="rank-badge rank-knockout">?</span>
+                    <span>Winner 4v9</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Bracket */}
+        <div className="bracket-half">
+          <div className="bracket-half-header">
+            <h3>Bottom Bracket</h3>
+            <Link to={`/player/${qualified[1]?.player.id}`} className="bye-player-inline">
+              <span className="rank-badge rank-semifinal">2</span>
+              <span>{qualified[1]?.player.name}</span>
+              <span className="bye-label">→ Semi</span>
+            </Link>
+          </div>
+
+          <div className="bracket-tree">
+            {/* R1 */}
+            <div className="bracket-column">
+              <div className="bracket-column-label">Round 1</div>
+              {bottomBracketR1.length > 0 ? (
+                bottomBracketR1
+                  .sort((a, b) => (a.knockout_position || 0) - (b.knockout_position || 0))
+                  .map((match) => <BracketMatch key={match.id} match={match} />)
+              ) : (
+                <>
+                  <BracketPreview seed1={5} seed2={8} qualified={qualified} />
+                  <BracketPreview seed1={6} seed2={7} qualified={qualified} />
+                </>
+              )}
+            </div>
+
+            {/* R2 */}
+            <div className="bracket-column">
+              <div className="bracket-column-label">Round 2</div>
+              {bottomBracketR2 ? (
+                <BracketMatch match={bottomBracketR2} />
+              ) : (
+                <div className="bracket-match-card pending">
+                  <div className="bracket-player">
+                    <span className="rank-badge rank-knockout">?</span>
+                    <span>Winner 5v8</span>
+                  </div>
+                  <div className="bracket-player">
+                    <span className="rank-badge rank-knockout">?</span>
+                    <span>Winner 6v7</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Finals Stage - Semifinals + Final */}
+        <div className="bracket-finals-stage">
+          <h3>Finals Stage</h3>
+
+          <div className="bracket-finals-grid">
+            {/* Semifinals */}
+            <div className="bracket-semifinals">
+              <div className="bracket-semi-match">
+                <div className="bracket-semi-label">Semifinal (Top Bracket)</div>
+                {topSemifinal ? (
+                  <BracketMatch match={topSemifinal} />
+                ) : (
+                  <SemifinalPreview byePlayer={qualified[0]} r2WinnerLabel="Top R2 Winner" />
+                )}
+              </div>
+
+              <div className="bracket-semi-match">
+                <div className="bracket-semi-label">Semifinal (Bottom Bracket)</div>
+                {bottomSemifinal ? (
+                  <BracketMatch match={bottomSemifinal} />
+                ) : (
+                  <SemifinalPreview byePlayer={qualified[1]} r2WinnerLabel="Bottom R2 Winner" />
+                )}
+              </div>
+            </div>
+
+            {/* Final */}
+            <div className="bracket-final-match">
+              <div className="bracket-final-label">Final</div>
+              {final ? (
+                <BracketMatch match={final} isFinal />
+              ) : (
+                <div className="bracket-match-card pending final">
+                  <div className="bracket-player">
+                    <span className="rank-badge rank-knockout">?</span>
+                    <span>Top Semi Winner</span>
+                  </div>
+                  <div className="bracket-player">
+                    <span className="rank-badge rank-knockout">?</span>
+                    <span>Bottom Semi Winner</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </main>

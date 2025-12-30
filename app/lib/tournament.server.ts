@@ -246,11 +246,11 @@ export function getKnockoutRoundUpdates(
   allKnockoutMatches: Match[],
   standings: PlayerStanding[]
 ): {
-  inserts: { player1_id: string; player2_id: string; phase: string; status: string }[];
+  inserts: { player1_id: string; player2_id: string; phase: string; status: string; knockout_position?: number }[];
   deletes: string[]; // Match IDs to delete
 } {
   const result: {
-    inserts: { player1_id: string; player2_id: string; phase: string; status: string }[];
+    inserts: { player1_id: string; player2_id: string; phase: string; status: string; knockout_position?: number }[];
     deletes: string[];
   } = { inserts: [], deletes: [] };
 
@@ -282,7 +282,8 @@ export function getKnockoutRoundUpdates(
     const expectedMatchups = generateNextRoundMatchups(
       progression.nextPhase,
       winners,
-      standings
+      standings,
+      allKnockoutMatches
     );
 
     if (!expectedMatchups) continue;
@@ -325,6 +326,7 @@ export function getKnockoutRoundUpdates(
         player2_id: m.player2_id,
         phase: progression.nextPhase,
         status: "scheduled",
+        knockout_position: m.knockout_position,
       })));
     }
   }
@@ -334,40 +336,52 @@ export function getKnockoutRoundUpdates(
 
 /**
  * Generate matchups for a given knockout phase based on winners.
+ * Uses fixed bracket paths: top bracket (pos 1,2) and bottom bracket (pos 3,4).
  */
 function generateNextRoundMatchups(
   phase: string,
   winners: string[],
-  standings: PlayerStanding[]
-): { player1_id: string; player2_id: string }[] | null {
+  standings: PlayerStanding[],
+  allKnockoutMatches: Match[]
+): { player1_id: string; player2_id: string; knockout_position?: number }[] | null {
   if (phase === "knockout_r2") {
-    // Round 2: Reseed winners by their original league rank
-    const winnerStandings = winners
-      .map((id) => standings.find((s) => s.player.id === id)!)
-      .filter((s) => s !== undefined)
-      .sort((a, b) => a.rank - b.rank);
+    // Round 2: Fixed paths based on bracket position
+    // Top bracket: pos 1 (3v10) winner vs pos 2 (4v9) winner
+    // Bottom bracket: pos 3 (5v8) winner vs pos 4 (6v7) winner
+    const r1Matches = allKnockoutMatches.filter((m) => m.phase === "knockout_r1");
 
-    if (winnerStandings.length !== 4) return null;
+    const pos1Match = r1Matches.find((m) => m.knockout_position === 1);
+    const pos2Match = r1Matches.find((m) => m.knockout_position === 2);
+    const pos3Match = r1Matches.find((m) => m.knockout_position === 3);
+    const pos4Match = r1Matches.find((m) => m.knockout_position === 4);
+
+    if (!pos1Match?.winner_id || !pos2Match?.winner_id || !pos3Match?.winner_id || !pos4Match?.winner_id) {
+      return null;
+    }
 
     return [
-      { player1_id: winnerStandings[0].player.id, player2_id: winnerStandings[3].player.id },
-      { player1_id: winnerStandings[1].player.id, player2_id: winnerStandings[2].player.id },
+      { player1_id: pos1Match.winner_id, player2_id: pos2Match.winner_id, knockout_position: 1 }, // Top bracket R2
+      { player1_id: pos3Match.winner_id, player2_id: pos4Match.winner_id, knockout_position: 2 }, // Bottom bracket R2
     ];
   }
 
   if (phase === "semifinal") {
-    // Semifinals: 1st seed vs worse R2 winner, 2nd seed vs better R2 winner
+    // Semifinals: Fixed paths
+    // Semi 1: #1 seed vs top bracket R2 winner (pos 1)
+    // Semi 2: #2 seed vs bottom bracket R2 winner (pos 2)
     const byePlayers = standings.slice(0, 2);
-    const r2Winners = winners
-      .map((id) => standings.find((s) => s.player.id === id)!)
-      .filter((s) => s !== undefined)
-      .sort((a, b) => a.rank - b.rank);
+    const r2Matches = allKnockoutMatches.filter((m) => m.phase === "knockout_r2");
 
-    if (r2Winners.length !== 2 || byePlayers.length !== 2) return null;
+    const topBracketR2 = r2Matches.find((m) => m.knockout_position === 1);
+    const bottomBracketR2 = r2Matches.find((m) => m.knockout_position === 2);
+
+    if (!topBracketR2?.winner_id || !bottomBracketR2?.winner_id || byePlayers.length !== 2) {
+      return null;
+    }
 
     return [
-      { player1_id: byePlayers[0].player.id, player2_id: r2Winners[1].player.id },
-      { player1_id: byePlayers[1].player.id, player2_id: r2Winners[0].player.id },
+      { player1_id: byePlayers[0].player.id, player2_id: topBracketR2.winner_id, knockout_position: 1 }, // #1 vs top bracket
+      { player1_id: byePlayers[1].player.id, player2_id: bottomBracketR2.winner_id, knockout_position: 2 }, // #2 vs bottom bracket
     ];
   }
 
