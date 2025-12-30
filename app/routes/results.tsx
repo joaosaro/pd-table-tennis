@@ -15,6 +15,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const status = url.searchParams.get("status") || "all";
   const phase = url.searchParams.get("phase") || "all";
+  const playerId = url.searchParams.get("player") || "all";
+
+  // Fetch all players for the filter dropdown
+  const { data: players } = await supabase
+    .from("players")
+    .select("id, name")
+    .order("name", { ascending: true });
 
   let query = supabase
     .from("matches")
@@ -35,17 +42,25 @@ export async function loader({ request }: Route.LoaderArgs) {
     query = query.eq("phase", phase);
   }
 
+  if (playerId !== "all") {
+    query = query.or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`);
+  }
+
   const { data: matches } = await query;
 
-  return { matches: (matches as MatchWithPlayers[]) || [] };
+  return {
+    matches: (matches as MatchWithPlayers[]) || [],
+    players: players || [],
+  };
 }
 
 export default function Results() {
-  const { matches } = useLoaderData<typeof loader>();
+  const { matches, players } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const currentStatus = searchParams.get("status") || "all";
   const currentPhase = searchParams.get("phase") || "all";
+  const currentPlayer = searchParams.get("player") || "all";
 
   const completedMatches = matches.filter((m) => m.status === "completed");
   const scheduledMatches = matches.filter((m) => m.status === "scheduled");
@@ -96,6 +111,21 @@ export default function Results() {
             <option value="knockout_r2">Knockout R2</option>
             <option value="semifinal">Semifinals</option>
             <option value="final">Final</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label>Player:</label>
+          <select
+            value={currentPlayer}
+            onChange={(e) => updateFilter("player", e.target.value)}
+            className="form-select"
+          >
+            <option value="all">All Players</option>
+            {players.map((player) => (
+              <option key={player.id} value={player.id}>
+                {player.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>

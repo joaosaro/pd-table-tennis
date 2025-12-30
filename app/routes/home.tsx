@@ -1,6 +1,7 @@
 import { Link, useLoaderData } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { MatchWithPlayers, TournamentSettings } from "~/lib/types";
+import { calculateStandings } from "~/lib/tournament.server";
+import type { MatchWithPlayers, Player, TournamentSettings } from "~/lib/types";
 import type { Route } from "./+types/home";
 
 export function meta() {
@@ -19,10 +20,24 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*")
     .single();
 
-  // Get player count
-  const { count: playerCount } = await supabase
+  // Get all players for standings
+  const { data: players } = await supabase
     .from("players")
-    .select("*", { count: "exact", head: true });
+    .select("*")
+    .order("name");
+
+  // Get all completed league matches for standings
+  const { data: leagueMatches } = await supabase
+    .from("matches")
+    .select(
+      `
+      *,
+      player1:players!matches_player1_id_fkey(*),
+      player2:players!matches_player2_id_fkey(*)
+    `
+    )
+    .eq("phase", "league")
+    .eq("status", "completed");
 
   // Get match stats
   const { count: totalMatches } = await supabase
@@ -51,12 +66,19 @@ export async function loader({ request }: Route.LoaderArgs) {
     .order("recorded_at", { ascending: false })
     .limit(5);
 
+  // Calculate standings
+  const standings = calculateStandings(
+    (players as Player[]) || [],
+    (leagueMatches as MatchWithPlayers[]) || []
+  );
+
   return {
     settings: settings as TournamentSettings | null,
-    playerCount: playerCount || 0,
+    playerCount: (players || []).length,
     totalMatches: totalMatches || 0,
     completedMatches: completedMatches || 0,
     recentMatches: (recentMatches as MatchWithPlayers[]) || [],
+    standings: standings.slice(0, 10), // Top 10 for minimal view
   };
 }
 
@@ -67,6 +89,7 @@ export default function Home() {
     totalMatches,
     completedMatches,
     recentMatches,
+    standings,
   } = useLoaderData<typeof loader>();
 
   const progress =
@@ -104,6 +127,77 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="home-columns">
+        <div className="home-column">
+          <div className="column-header">
+            <h2>Standings</h2>
+            <Link to="/standings" className="view-all-link">
+              View all
+            </Link>
+          </div>
+          {standings.length > 0 ? (
+            <div className="mini-standings">
+              {standings.map((standing) => (
+                <Link
+                  key={standing.player.id}
+                  to={`/player/${standing.player.id}`}
+                  className={`mini-standing-row ${getRankClass(standing.rank)}`}
+                >
+                  <span className="mini-rank">{standing.rank}</span>
+                  <span className="mini-player-name">
+                    {standing.player.name}
+                  </span>
+                  <span className="mini-points">{standing.points} pts</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="empty">No standings yet.</p>
+          )}
+        </div>
+
+        <div className="home-column">
+          <div className="column-header">
+            <h2>Recent Results</h2>
+            <Link to="/results" className="view-all-link">
+              View all
+            </Link>
+          </div>
+          {recentMatches.length > 0 ? (
+            <div className="results-list">
+              {recentMatches.map((match) => (
+                <Link
+                  to={`/match/${match.id}`}
+                  key={match.id}
+                  className="result-card"
+                >
+                  <div className="result-players">
+                    <span
+                      className={
+                        match.winner_id === match.player1_id ? "winner" : ""
+                      }
+                    >
+                      {match.player1.name}
+                    </span>
+                    <span className="vs">vs</span>
+                    <span
+                      className={
+                        match.winner_id === match.player2_id ? "winner" : ""
+                      }
+                    >
+                      {match.player2.name}
+                    </span>
+                  </div>
+                  <div className="result-score">{getMatchScore(match)}</div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="empty">No results yet.</p>
+          )}
+        </div>
+      </section>
+
       <section className="quick-links">
         <Link to="/standings" className="quick-link-card">
           <h3>Standings</h3>
@@ -122,42 +216,14 @@ export default function Home() {
           <p>Browse all participants</p>
         </Link>
       </section>
-
-      {recentMatches.length > 0 && (
-        <section className="recent-results">
-          <h2>Recent Results</h2>
-          <div className="results-list">
-            {recentMatches.map((match) => (
-              <Link
-                to={`/match/${match.id}`}
-                key={match.id}
-                className="result-card"
-              >
-                <div className="result-players">
-                  <span
-                    className={
-                      match.winner_id === match.player1_id ? "winner" : ""
-                    }
-                  >
-                    {match.player1.name}
-                  </span>
-                  <span className="vs">vs</span>
-                  <span
-                    className={
-                      match.winner_id === match.player2_id ? "winner" : ""
-                    }
-                  >
-                    {match.player2.name}
-                  </span>
-                </div>
-                <div className="result-score">{getMatchScore(match)}</div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
     </main>
   );
+}
+
+function getRankClass(rank: number): string {
+  if (rank <= 2) return "rank-semifinal";
+  if (rank <= 10) return "rank-knockout";
+  return "";
 }
 
 function getMatchScore(match: MatchWithPlayers): string {

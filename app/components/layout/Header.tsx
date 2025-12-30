@@ -7,6 +7,7 @@ interface HeaderProps {
 
 export function Header({ user }: HeaderProps) {
   const isAdmin = user?.role === "admin";
+  const canEdit = user?.role === "admin" || user?.role === "editor";
 
   return (
     <header className="header">
@@ -36,6 +37,11 @@ export function Header({ user }: HeaderProps) {
               <span className="user-name">{user.fullName || user.email}</span>
               {user.role !== "viewer" && (
                 <span className="user-role">{user.role}</span>
+              )}
+              {canEdit && (
+                <Link to="/editor/matches" className="nav-link editor-link">
+                  Record
+                </Link>
               )}
               {isAdmin && (
                 <Link to="/admin" className="nav-link admin-link">

@@ -1,4 +1,5 @@
 import { Link, useLoaderData } from "react-router";
+import { getUser } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type { MatchWithPlayers } from "~/lib/types";
 import { TIER_POINTS } from "~/lib/types";
@@ -16,6 +17,7 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
+  const { user } = await getUser(request);
   const { supabase } = createSupabaseServerClient(request);
 
   const { data: match } = await supabase
@@ -34,11 +36,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Match not found", { status: 404 });
   }
 
-  return { match: match as MatchWithPlayers };
+  const canEdit = user?.role === "admin" || user?.role === "editor";
+
+  return { match: match as MatchWithPlayers, canEdit };
 }
 
 export default function MatchDetails() {
-  const { match } = useLoaderData<typeof loader>();
+  const { match, canEdit } = useLoaderData<typeof loader>();
 
   const sets = [
     { num: 1, p1: match.set1_p1, p2: match.set1_p2 },
@@ -64,7 +68,15 @@ export default function MatchDetails() {
             {formatPhase(match.phase)}
           </span>
           {match.status === "scheduled" && (
-            <span className="status-badge scheduled">Results</span>
+            <span className="status-badge scheduled">Scheduled</span>
+          )}
+          {canEdit && (
+            <Link
+              to={`/editor/record/${match.id}`}
+              className="btn btn-primary"
+            >
+              {match.status === "scheduled" ? "Record Result" : "Edit Result"}
+            </Link>
           )}
         </div>
 

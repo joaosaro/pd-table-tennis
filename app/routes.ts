@@ -16,6 +16,7 @@ export default [
   route("logout", "routes/auth/logout.tsx"),
 
   // Editor routes
+  route("editor/matches", "routes/editor/matches.tsx"),
   route("editor/record/:matchId", "routes/editor/record.$matchId.tsx"),
 
   // Admin routes
