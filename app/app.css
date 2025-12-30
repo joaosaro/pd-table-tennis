@@ -1570,6 +1570,8 @@ body {
   padding: 0.125rem 0.5rem;
   border-radius: 9999px;
   background: var(--color-gray-200);
+  display: flex;
+  align-items: center;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1581,8 +1583,6 @@ body {
 .phase-badge.league {
   background: var(--color-blue-500);
   color: white;
-  display: flex;
-  align-items: center;
 }
 
 .phase-badge.knockout_r1,
