@@ -4,17 +4,13 @@
 
 - **Priority**: high
 - **Created**: 2024-12-30
-- **Status**: open
+- **Status**: closed
 
-Currently all league matches are pre-created in the database when the tournament starts, preventing new players from being added mid-tournament.
-
-**Proposed change:**
-- Remove upfront match creation for league phase
-- Calculate possible matches dynamically (all player pairs)
-- Create match records only when editor/admin records a result
-- Editor/admin selects two opponents from a list to record a match
-
-This enables adding new players at any point during the league phase.
+Implemented on-demand league match creation:
+- New route `/editor/record-league` for selecting two players and recording result
+- League progress shown in editor matches page with remaining match count
+- Removed upfront league match generation from admin
+- Players can now be added at any time during the league phase
 
 ---
 
@@ -22,8 +18,8 @@ This enables adding new players at any point during the league phase.
 
 - **Priority**: high
 - **Created**: 2024-12-30
-- **Status**: open
+- **Status**: closed
 
-Admin should be able to delete players from the tournament. Need to handle cascade deletion of associated matches.
+Already implemented in `app/routes/admin/players.tsx`. Delete button exists with cascade deletion via DB schema.
 
 ---

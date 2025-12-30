@@ -17,6 +17,7 @@ export default [
 
   // Editor routes
   route("editor/matches", "routes/editor/matches.tsx"),
+  route("editor/record-league", "routes/editor/record-league.tsx"),
   route("editor/record/:matchId", "routes/editor/record.$matchId.tsx"),
 
   // Admin routes

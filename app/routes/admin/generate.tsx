@@ -8,10 +8,7 @@ import {
 } from "react-router";
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import {
-  calculateStandings,
-  generateLeagueMatchPairs,
-} from "~/lib/tournament.server";
+import { calculateStandings } from "~/lib/tournament.server";
 import type { MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/generate";
 
@@ -25,11 +22,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
   const { data: players } = await supabase.from("players").select("*");
-
-  const { count: leagueMatchCount } = await supabase
-    .from("matches")
-    .select("*", { count: "exact", head: true })
-    .eq("phase", "league");
 
   const { count: knockoutMatchCount } = await supabase
     .from("matches")
@@ -53,14 +45,21 @@ export async function loader({ request }: Route.LoaderArgs) {
     (leagueMatches as MatchWithPlayers[]) || []
   );
 
+  // Calculate league progress
+  const totalPossibleMatches = players
+    ? (players.length * (players.length - 1)) / 2
+    : 0;
+  const completedLeagueMatches = leagueMatches?.length || 0;
+
   return data(
     {
       playerCount: players?.length || 0,
-      leagueMatchCount: leagueMatchCount || 0,
       knockoutMatchCount: knockoutMatchCount || 0,
-      expectedLeagueMatches: players
-        ? (players.length * (players.length - 1)) / 2
-        : 0,
+      leagueProgress: {
+        completed: completedLeagueMatches,
+        total: totalPossibleMatches,
+        remaining: totalPossibleMatches - completedLeagueMatches,
+      },
       canGenerateKnockout: standings.length >= 10 && (knockoutMatchCount || 0) === 0,
     },
     { headers }
@@ -73,44 +72,6 @@ export async function action({ request }: Route.ActionArgs) {
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
-
-  if (intent === "generate_league") {
-    const { data: players } = await supabase.from("players").select("*");
-
-    if (!players || players.length < 2) {
-      return { error: "Need at least 2 players to generate matches" };
-    }
-
-    // Check if league matches already exist
-    const { count } = await supabase
-      .from("matches")
-      .select("*", { count: "exact", head: true })
-      .eq("phase", "league");
-
-    if (count && count > 0) {
-      return {
-        error: "League matches already exist. Delete them first to regenerate.",
-      };
-    }
-
-    const pairs = generateLeagueMatchPairs(players as Player[]);
-    const matches = pairs.map(([p1, p2]) => ({
-      player1_id: p1.id,
-      player2_id: p2.id,
-      phase: "league",
-      status: "scheduled",
-    }));
-
-    const { error } = await supabase.from("matches").insert(matches);
-
-    if (error) {
-      return { error: error.message };
-    }
-
-    const allHeaders = new Headers(authHeaders);
-    headers.forEach((value, key) => allHeaders.append(key, value));
-    return redirect("/admin/matches", { headers: allHeaders });
-  }
 
   if (intent === "generate_knockout") {
     // Check if knockout matches already exist
@@ -200,9 +161,8 @@ export async function action({ request }: Route.ActionArgs) {
 export default function AdminGenerate() {
   const {
     playerCount,
-    leagueMatchCount,
     knockoutMatchCount,
-    expectedLeagueMatches,
+    leagueProgress,
     canGenerateKnockout,
   } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -219,33 +179,21 @@ export default function AdminGenerate() {
 
       <div className="generate-sections">
         <section className="generate-section">
-          <h2>League Matches</h2>
+          <h2>League Progress</h2>
           <p>
-            Generate round-robin matches where each player plays every other
-            player once.
+            League matches are recorded on-demand. Editors can record matches
+            between any two players who haven't played yet.
           </p>
           <div className="generate-stats">
             <p>Players: {playerCount}</p>
             <p>
-              League matches: {leagueMatchCount} / {expectedLeagueMatches}
+              League matches: {leagueProgress.completed} / {leagueProgress.total}
             </p>
+            <p>Remaining: {leagueProgress.remaining}</p>
           </div>
-          <Form method="post">
-            <button
-              type="submit"
-              name="intent"
-              value="generate_league"
-              className="btn btn-primary"
-              disabled={isSubmitting || playerCount < 2 || leagueMatchCount > 0}
-            >
-              {isSubmitting ? "Generating..." : "Generate League Matches"}
-            </button>
-          </Form>
-          {leagueMatchCount > 0 && (
-            <p className="help-text">
-              League matches already exist. Go to Matches page to manage them.
-            </p>
-          )}
+          <a href="/editor/record-league" className="btn btn-secondary">
+            Record League Match
+          </a>
         </section>
 
         <section className="generate-section">

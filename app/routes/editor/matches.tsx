@@ -1,7 +1,7 @@
 import { Link, data, useLoaderData, useSearchParams } from "react-router";
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { MatchWithPlayers } from "~/lib/types";
+import type { MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/matches";
 
 export function meta() {
@@ -19,7 +19,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Fetch all players for the filter dropdown
   const { data: players } = await supabase
     .from("players")
-    .select("id, name")
+    .select("*")
     .order("name", { ascending: true });
 
   let query = supabase
@@ -44,17 +44,31 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: matches } = await query;
 
+  // Calculate league progress
+  const allPlayers = (players as Player[]) || [];
+  const leagueMatches = (matches as MatchWithPlayers[])?.filter(
+    (m) => m.phase === "league" && m.status === "completed"
+  ) || [];
+
+  const totalPossibleMatches = (allPlayers.length * (allPlayers.length - 1)) / 2;
+  const completedLeagueMatches = leagueMatches.length;
+
   return data(
     {
       matches: (matches as MatchWithPlayers[]) || [],
       players: players || [],
+      leagueProgress: {
+        completed: completedLeagueMatches,
+        total: totalPossibleMatches,
+        remaining: totalPossibleMatches - completedLeagueMatches,
+      },
     },
     { headers }
   );
 }
 
 export default function EditorMatches() {
-  const { matches, players } = useLoaderData<typeof loader>();
+  const { matches, players, leagueProgress } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const currentPhase = searchParams.get("phase") || "all";
@@ -79,6 +93,23 @@ export default function EditorMatches() {
         <h1>Record Matches</h1>
         <p>Select a match to record the result</p>
       </div>
+
+      {leagueProgress.remaining > 0 && (
+        <section className="admin-section league-record-section">
+          <div className="league-progress-header">
+            <div>
+              <h2>League Progress</h2>
+              <p className="league-progress-stats">
+                {leagueProgress.completed} / {leagueProgress.total} matches
+                completed ({leagueProgress.remaining} remaining)
+              </p>
+            </div>
+            <Link to="/editor/record-league" className="btn btn-primary">
+              Record League Match
+            </Link>
+          </div>
+        </section>
+      )}
 
       <div className="results-filters">
         <div className="filter-group">
