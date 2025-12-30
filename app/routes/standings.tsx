@@ -60,7 +60,7 @@ export default function Standings() {
               <tr>
                 <th className="text-center">#</th>
                 <th>Player</th>
-                <th className="text-center">Tier</th>
+                <th className="text-center hide-mobile">Tier</th>
                 <th className="text-center">P</th>
                 <th className="text-center">W</th>
                 <th className="text-center">L</th>
@@ -90,7 +90,7 @@ export default function Standings() {
                       {standing.player.name}
                     </Link>
                   </td>
-                  <td className="text-center">
+                  <td className="text-center hide-mobile">
                     <span className={`tier-badge tier-${standing.player.tier}`}>
                       {standing.player.tier}
                     </span>
