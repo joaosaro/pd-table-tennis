@@ -1,4 +1,4 @@
-import { Link, data, useLoaderData } from "react-router";
+import { Link, data, useLoaderData, useSearchParams } from "react-router";
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type { MatchWithPlayers } from "~/lib/types";
@@ -12,8 +12,17 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { headers } = await requireRole(request, ["admin", "editor"]);
 
   const { supabase } = createSupabaseServerClient(request);
+  const url = new URL(request.url);
+  const phase = url.searchParams.get("phase") || "all";
+  const playerId = url.searchParams.get("player") || "all";
 
-  const { data: matches } = await supabase
+  // Fetch all players for the filter dropdown
+  const { data: players } = await supabase
+    .from("players")
+    .select("id, name")
+    .order("name", { ascending: true });
+
+  let query = supabase
     .from("matches")
     .select(
       `
@@ -25,20 +34,83 @@ export async function loader({ request }: Route.LoaderArgs) {
     .order("phase")
     .order("created_at");
 
-  return data({ matches: (matches as MatchWithPlayers[]) || [] }, { headers });
+  if (phase !== "all") {
+    query = query.eq("phase", phase);
+  }
+
+  if (playerId !== "all") {
+    query = query.or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`);
+  }
+
+  const { data: matches } = await query;
+
+  return data(
+    {
+      matches: (matches as MatchWithPlayers[]) || [],
+      players: players || [],
+    },
+    { headers }
+  );
 }
 
 export default function EditorMatches() {
-  const { matches } = useLoaderData<typeof loader>();
+  const { matches, players } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const currentPhase = searchParams.get("phase") || "all";
+  const currentPlayer = searchParams.get("player") || "all";
 
   const scheduledMatches = matches.filter((m) => m.status === "scheduled");
   const completedMatches = matches.filter((m) => m.status === "completed");
+
+  function updateFilter(key: string, value: string) {
+    const newParams = new URLSearchParams(searchParams);
+    if (value === "all") {
+      newParams.delete(key);
+    } else {
+      newParams.set(key, value);
+    }
+    setSearchParams(newParams);
+  }
 
   return (
     <div className="page">
       <div className="page-header">
         <h1>Record Matches</h1>
         <p>Select a match to record the result</p>
+      </div>
+
+      <div className="results-filters">
+        <div className="filter-group">
+          <label>Phase:</label>
+          <select
+            value={currentPhase}
+            onChange={(e) => updateFilter("phase", e.target.value)}
+            className="form-select"
+          >
+            <option value="all">All Phases</option>
+            <option value="league">League</option>
+            <option value="knockout_r1">Knockout R1</option>
+            <option value="knockout_r2">Knockout R2</option>
+            <option value="semifinal">Semifinals</option>
+            <option value="final">Final</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label>Player:</label>
+          <select
+            value={currentPlayer}
+            onChange={(e) => updateFilter("player", e.target.value)}
+            className="form-select"
+          >
+            <option value="all">All Players</option>
+            {players.map((player) => (
+              <option key={player.id} value={player.id}>
+                {player.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <section className="admin-section">
