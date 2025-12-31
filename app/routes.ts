@@ -30,4 +30,5 @@ export default [
   route("admin/generate", "routes/admin/generate.tsx"),
   route("admin/settings", "routes/admin/settings.tsx"),
   route("admin/users", "routes/admin/users.tsx"),
+  route("admin/export-results", "routes/admin/export-results.tsx"),
 ] satisfies RouteConfig;

@@ -1,7 +1,7 @@
-import { Link, useLoaderData, data } from "react-router";
-import type { Route } from "./+types/index";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { data, Link, useLoaderData } from "react-router";
 import { requireRole } from "~/lib/auth.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
+import type { Route } from "./+types/index";
 
 export function meta() {
   return [{ title: "Admin | PD Table Tennis" }];
@@ -29,12 +29,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     .from("users")
     .select("*", { count: "exact", head: true });
 
-  return data({
-    playerCount: playerCount || 0,
-    totalMatches: totalMatches || 0,
-    completedMatches: completedMatches || 0,
-    userCount: userCount || 0,
-  }, { headers });
+  return data(
+    {
+      playerCount: playerCount || 0,
+      totalMatches: totalMatches || 0,
+      completedMatches: completedMatches || 0,
+      userCount: userCount || 0,
+    },
+    { headers }
+  );
 }
 
 export default function AdminIndex() {
@@ -90,6 +93,9 @@ export default function AdminIndex() {
         <Link to="/admin/players">Manage Players</Link>
         <Link to="/admin/matches">Manage Matches</Link>
         <Link to="/admin/settings">Tournament Settings</Link>
+        <a href="/admin/export-results" download>
+          Export Results (CSV)
+        </a>
       </nav>
     </div>
   );
