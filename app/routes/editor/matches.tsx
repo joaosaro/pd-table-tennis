@@ -5,7 +5,7 @@ import type { MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/matches";
 
 export function meta() {
-  return [{ title: "Record Matches | PD Table Tennis" }];
+  return [{ title: "Submit Results | PD Table Tennis" }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -90,8 +90,8 @@ export default function EditorMatches() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Record Matches</h1>
-        <p>Select a match to record the result</p>
+        <h1>Submit Results</h1>
+        <p>Select a match to submit the result</p>
       </div>
 
       {leagueProgress.remaining > 0 && (
@@ -105,7 +105,7 @@ export default function EditorMatches() {
               </p>
             </div>
             <Link to="/editor/record-league" className="btn btn-primary">
-              Record League Match
+              Submit League Result
             </Link>
           </div>
         </section>

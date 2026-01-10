@@ -1,6 +1,6 @@
-import { Link, useLoaderData, useSearchParams } from "react-router";
+import { Link, useLoaderData, useOutletContext, useSearchParams } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { MatchWithPlayers } from "~/lib/types";
+import type { MatchWithPlayers, AppUser } from "~/lib/types";
 import type { Route } from "./+types/results";
 
 export function meta() {
@@ -56,6 +56,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function Results() {
   const { matches, players } = useLoaderData<typeof loader>();
+  const { user } = useOutletContext<{ user: AppUser | null }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const currentStatus = searchParams.get("status") || "all";
@@ -64,6 +65,8 @@ export default function Results() {
 
   const completedMatches = matches.filter((m) => m.status === "completed");
   const scheduledMatches = matches.filter((m) => m.status === "scheduled");
+
+  const canEdit = user?.role === "admin" || user?.role === "editor";
 
   function updateFilter(key: string, value: string) {
     const newParams = new URLSearchParams(searchParams);
@@ -84,6 +87,14 @@ export default function Results() {
           remaining
         </p>
       </div>
+
+      {canEdit && (
+        <div className="results-actions">
+          <Link to="/editor/record-league" className="btn btn-primary">
+            Submit Results
+          </Link>
+        </div>
+      )}
 
       <div className="results-filters">
         <div className="filter-group">

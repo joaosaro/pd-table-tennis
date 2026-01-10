@@ -33,26 +33,34 @@ export function Header({ user }: HeaderProps) {
 
         <div className="header-auth">
           {user ? (
-            <div className="user-menu">
-              <span className="user-name">{user.fullName || user.email}</span>
-              {user.role !== "viewer" && (
-                <span className="user-role">{user.role}</span>
-              )}
-              {canEdit && (
-                <Link to="/editor/matches" className="nav-link editor-link">
-                  Record
-                </Link>
-              )}
-              {isAdmin && (
-                <Link to="/admin" className="nav-link admin-link">
-                  Admin
-                </Link>
-              )}
-              <Form action="/logout" method="post">
-                <button type="submit" className="btn-logout">
-                  Logout
-                </button>
-              </Form>
+            <div className="user-dropdown">
+              <button className="dropdown-trigger">
+                <span className="user-name">{user.fullName || user.email}</span>
+                {user.role !== "viewer" && (
+                  <span className="user-role">{user.role}</span>
+                )}
+                <svg className="dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <div className="dropdown-menu">
+                {canEdit && (
+                  <Link to="/editor/matches" className="dropdown-item">
+                    Submit Results
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link to="/admin" className="dropdown-item">
+                    Admin
+                  </Link>
+                )}
+                <div className="dropdown-divider" />
+                <Form action="/logout" method="post">
+                  <button type="submit" className="dropdown-item dropdown-item-logout">
+                    Logout
+                  </button>
+                </Form>
+              </div>
             </div>
           ) : (
             <Link to="/login" className="btn-login">
