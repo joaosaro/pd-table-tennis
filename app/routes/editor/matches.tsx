@@ -46,11 +46,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Calculate league progress
   const allPlayers = (players as Player[]) || [];
-  const leagueMatches = (matches as MatchWithPlayers[])?.filter(
-    (m) => m.phase === "league" && m.status === "completed"
-  ) || [];
+  const leagueMatches =
+    (matches as MatchWithPlayers[])?.filter(
+      (m) => m.phase === "league" && m.status === "completed"
+    ) || [];
 
-  const totalPossibleMatches = (allPlayers.length * (allPlayers.length - 1)) / 2;
+  const totalPossibleMatches =
+    (allPlayers.length * (allPlayers.length - 1)) / 2;
   const completedLeagueMatches = leagueMatches.length;
 
   return data(
@@ -143,48 +145,6 @@ export default function EditorMatches() {
           </select>
         </div>
       </div>
-
-      <section className="admin-section">
-        <h2>Scheduled Matches ({scheduledMatches.length})</h2>
-        {scheduledMatches.length === 0 ? (
-          <p className="empty">No scheduled matches.</p>
-        ) : (
-          <div className="results-list">
-            {scheduledMatches.map((match) => (
-              <div key={match.id} className="results-card scheduled">
-                <div className="results-card-main">
-                  <div className="results-player">
-                    <span className={`tier-badge tier-${match.player1.tier}`}>
-                      {match.player1.tier}
-                    </span>
-                    <span>{match.player1.name}</span>
-                  </div>
-                  <div className="results-vs">
-                    <span>vs</span>
-                  </div>
-                  <div className="results-player">
-                    <span>{match.player2.name}</span>
-                    <span className={`tier-badge tier-${match.player2.tier}`}>
-                      {match.player2.tier}
-                    </span>
-                  </div>
-                </div>
-                <div className="results-card-actions">
-                  <span className={`phase-badge ${match.phase}`}>
-                    {formatPhase(match.phase)}
-                  </span>
-                  <Link
-                    to={`/editor/record/${match.id}`}
-                    className="btn btn-primary"
-                  >
-                    Record Result
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
       <section className="admin-section">
         <h2>Completed Matches ({completedMatches.length})</h2>

@@ -211,9 +211,9 @@ export default function Home() {
           <h3>Bracket</h3>
           <p>View knockout bracket</p>
         </Link>
-        <Link to="/players" className="quick-link-card">
-          <h3>Players</h3>
-          <p>Browse all participants</p>
+        <Link to="/editor/matches" className="quick-link-card quick-link-card--cta">
+          <h3>Submit Results</h3>
+          <p>Record your match scores</p>
         </Link>
       </section>
     </main>

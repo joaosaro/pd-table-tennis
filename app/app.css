@@ -642,6 +642,39 @@ body {
   }
 }
 
+.quick-link-card--cta {
+  background: var(--color-blue-700);
+  border-color: var(--color-blue-700);
+  color: white;
+}
+
+.quick-link-card--cta:hover {
+  background: var(--color-blue-500);
+  border-color: var(--color-blue-500);
+}
+
+.quick-link-card--cta h3 {
+  color: white;
+}
+
+.quick-link-card--cta p {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (prefers-color-scheme: dark) {
+  .quick-link-card--cta {
+    background: var(--color-blue-700);
+    border-color: var(--color-blue-700);
+  }
+  .quick-link-card--cta:hover {
+    background: var(--color-blue-500);
+    border-color: var(--color-blue-500);
+  }
+  .quick-link-card--cta p {
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
 .recent-results h2 {
   margin: 0 0 1rem 0;
 }
