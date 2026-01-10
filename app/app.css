@@ -449,24 +449,6 @@ body {
   }
 }
 
-.dropdown-item-logout {
-  color: var(--color-error);
-  border-radius: 0 0 0.5rem 0.5rem;
-}
-
-.dropdown-item-logout:hover {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-@media (prefers-color-scheme: dark) {
-  .dropdown-item-logout {
-    color: #fca5a5;
-  }
-  .dropdown-item-logout:hover {
-    background: rgba(239, 68, 68, 0.15);
-  }
-}
-
 .user-name {
   font-size: 0.875rem;
   color: var(--color-gray-700);
