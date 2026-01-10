@@ -336,11 +336,17 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: transparent;
+  background: var(--color-gray-100);
   border: 1px solid var(--color-gray-300);
   border-radius: 0.375rem;
   cursor: pointer;
   font-family: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dropdown-trigger {
+    background: var(--color-gray-800);
+  }
 }
 
 .dropdown-trigger:hover {
