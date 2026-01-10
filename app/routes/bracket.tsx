@@ -28,6 +28,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     .eq("phase", "league")
     .eq("status", "completed");
 
+  // Check if league phase is still active (has incomplete matches)
+  const { count: incompleteLeagueCount } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .eq("phase", "league")
+    .eq("status", "scheduled");
+
   // Get knockout matches
   const { data: knockoutMatches } = await supabase
     .from("matches")
@@ -46,11 +53,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     standings,
     knockoutMatches: (knockoutMatches as MatchWithPlayers[]) || [],
+    leagueInProgress: (incompleteLeagueCount ?? 0) > 0,
   };
 }
 
 export default function Bracket() {
-  const { standings, knockoutMatches } = useLoaderData<typeof loader>();
+  const { standings, knockoutMatches, leagueInProgress } = useLoaderData<typeof loader>();
 
   // Get qualified players (top 10)
   const qualified = standings.slice(0, 10);
@@ -95,6 +103,12 @@ export default function Bracket() {
         <h1>Knockout Bracket</h1>
         <p>Top 2 from league go directly to semifinals. 3rd-10th play knockout rounds.</p>
       </div>
+
+      {leagueInProgress && (
+        <div className="provisional-banner">
+          This bracket is provisional. Rankings may change as league matches are completed.
+        </div>
+      )}
 
       <div className="bracket-dual">
         {/* Top Bracket */}
