@@ -37,7 +37,7 @@ export function Header({ user }: HeaderProps) {
               <button className="dropdown-trigger">
                 <span className="user-name">{user.fullName || user.email}</span>
                 {user.role !== "viewer" && (
-                  <span className="user-role">{user.role}</span>
+                  <span className="user-role hide-mob">{user.role}</span>
                 )}
                 <svg
                   className="dropdown-arrow"

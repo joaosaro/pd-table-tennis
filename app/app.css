@@ -421,7 +421,7 @@ body {
 }
 
 .dropdown-item:hover {
-  background: var(--color-gray-700);
+  background: var(--color-gray-100);
 }
 
 .dropdown-item:first-child {
@@ -1558,7 +1558,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  .hide-mobile {
+  .hide-mobile,
+  .hide-mob {
     display: none;
   }
 
