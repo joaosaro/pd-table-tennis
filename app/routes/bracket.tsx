@@ -1,8 +1,8 @@
 import { Link, useLoaderData } from "react-router";
-import type { Route } from "./+types/bracket";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { calculateStandings } from "~/lib/tournament.server";
-import type { Player, MatchWithPlayers, PlayerStanding } from "~/lib/types";
+import type { MatchWithPlayers, Player, PlayerStanding } from "~/lib/types";
+import type { Route } from "./+types/bracket";
 
 export function meta() {
   return [
@@ -20,11 +20,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Get all league matches to calculate standings
   const { data: leagueMatches } = await supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `)
+    `
+    )
     .eq("phase", "league")
     .eq("status", "completed");
 
@@ -38,11 +40,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Get knockout matches
   const { data: knockoutMatches } = await supabase
     .from("matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `)
+    `
+    )
     .neq("phase", "league");
 
   const standings = calculateStandings(
@@ -58,7 +62,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Bracket() {
-  const { standings, knockoutMatches, leagueInProgress } = useLoaderData<typeof loader>();
+  const { standings, knockoutMatches, leagueInProgress } =
+    useLoaderData<typeof loader>();
 
   // Get qualified players (top 10)
   const qualified = standings.slice(0, 10);
@@ -69,29 +74,13 @@ export default function Bracket() {
   const semifinals = knockoutMatches.filter((m) => m.phase === "semifinal");
   const final = knockoutMatches.find((m) => m.phase === "final");
 
-  if (qualified.length < 10) {
-    return (
-      <main className="page">
-        <div className="page-header">
-          <h1>Knockout Bracket</h1>
-          <p>Bracket will be available after league phase completes.</p>
-        </div>
-        <div className="bracket-placeholder">
-          <p>
-            Need at least 10 players to qualify. Currently {qualified.length} have
-            played league matches.
-          </p>
-          <Link to="/standings" className="btn btn-primary">
-            View Standings
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
   // Organize matches by bracket path using knockout_position
-  const topBracketR1 = round1.filter((m) => m.knockout_position === 1 || m.knockout_position === 2);
-  const bottomBracketR1 = round1.filter((m) => m.knockout_position === 3 || m.knockout_position === 4);
+  const topBracketR1 = round1.filter(
+    (m) => m.knockout_position === 1 || m.knockout_position === 2
+  );
+  const bottomBracketR1 = round1.filter(
+    (m) => m.knockout_position === 3 || m.knockout_position === 4
+  );
   const topBracketR2 = round2.find((m) => m.knockout_position === 1);
   const bottomBracketR2 = round2.find((m) => m.knockout_position === 2);
   const topSemifinal = semifinals.find((m) => m.knockout_position === 1);
@@ -101,12 +90,16 @@ export default function Bracket() {
     <main className="page">
       <div className="page-header">
         <h1>Knockout Bracket</h1>
-        <p>Top 2 from league go directly to semifinals. 3rd-10th play knockout rounds.</p>
+        <p>
+          Top 2 from league go directly to semifinals. 3rd-10th play knockout
+          rounds.
+        </p>
       </div>
 
       {leagueInProgress && (
         <div className="provisional-banner">
-          This bracket is provisional. Rankings may change as league matches are completed.
+          <strong>Provisional standings:</strong> League phase is still ongoing.
+          Rankings may change as matches are completed.
         </div>
       )}
 
@@ -115,7 +108,10 @@ export default function Bracket() {
         <div className="bracket-half">
           <div className="bracket-half-header">
             <h3>Top Bracket</h3>
-            <Link to={`/player/${qualified[0]?.player.id}`} className="bye-player-inline">
+            <Link
+              to={`/player/${qualified[0]?.player.id}`}
+              className="bye-player-inline"
+            >
               <span className="rank-badge rank-semifinal">1</span>
               <span>{qualified[0]?.player.name}</span>
               <span className="bye-label">→ Semi</span>
@@ -128,7 +124,10 @@ export default function Bracket() {
               <div className="bracket-column-label">Round 1</div>
               {topBracketR1.length > 0 ? (
                 topBracketR1
-                  .sort((a, b) => (a.knockout_position || 0) - (b.knockout_position || 0))
+                  .sort(
+                    (a, b) =>
+                      (a.knockout_position || 0) - (b.knockout_position || 0)
+                  )
                   .map((match) => <BracketMatch key={match.id} match={match} />)
               ) : (
                 <>
@@ -163,7 +162,10 @@ export default function Bracket() {
         <div className="bracket-half">
           <div className="bracket-half-header">
             <h3>Bottom Bracket</h3>
-            <Link to={`/player/${qualified[1]?.player.id}`} className="bye-player-inline">
+            <Link
+              to={`/player/${qualified[1]?.player.id}`}
+              className="bye-player-inline"
+            >
               <span className="rank-badge rank-semifinal">2</span>
               <span>{qualified[1]?.player.name}</span>
               <span className="bye-label">→ Semi</span>
@@ -176,7 +178,10 @@ export default function Bracket() {
               <div className="bracket-column-label">Round 1</div>
               {bottomBracketR1.length > 0 ? (
                 bottomBracketR1
-                  .sort((a, b) => (a.knockout_position || 0) - (b.knockout_position || 0))
+                  .sort(
+                    (a, b) =>
+                      (a.knockout_position || 0) - (b.knockout_position || 0)
+                  )
                   .map((match) => <BracketMatch key={match.id} match={match} />)
               ) : (
                 <>
@@ -215,20 +220,30 @@ export default function Bracket() {
             {/* Semifinals */}
             <div className="bracket-semifinals">
               <div className="bracket-semi-match">
-                <div className="bracket-semi-label">Semifinal (Top Bracket)</div>
+                <div className="bracket-semi-label">
+                  Semifinal (Top Bracket)
+                </div>
                 {topSemifinal ? (
                   <BracketMatch match={topSemifinal} />
                 ) : (
-                  <SemifinalPreview byePlayer={qualified[0]} r2WinnerLabel="Top R2 Winner" />
+                  <SemifinalPreview
+                    byePlayer={qualified[0]}
+                    r2WinnerLabel="Top R2 Winner"
+                  />
                 )}
               </div>
 
               <div className="bracket-semi-match">
-                <div className="bracket-semi-label">Semifinal (Bottom Bracket)</div>
+                <div className="bracket-semi-label">
+                  Semifinal (Bottom Bracket)
+                </div>
                 {bottomSemifinal ? (
                   <BracketMatch match={bottomSemifinal} />
                 ) : (
-                  <SemifinalPreview byePlayer={qualified[1]} r2WinnerLabel="Bottom R2 Winner" />
+                  <SemifinalPreview
+                    byePlayer={qualified[1]}
+                    r2WinnerLabel="Bottom R2 Winner"
+                  />
                 )}
               </div>
             </div>
