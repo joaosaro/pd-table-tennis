@@ -1496,6 +1496,41 @@ body {
 }
 
 /* Standings page */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-bar label {
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+}
+
+@media (prefers-color-scheme: dark) {
+  .filter-bar label {
+    color: var(--color-gray-300);
+  }
+}
+
+.filter-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 0.375rem;
+  background: white;
+  font-size: 0.875rem;
+  min-width: 150px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .filter-select {
+    background: var(--color-gray-800);
+    border-color: var(--color-gray-600);
+    color: white;
+  }
+}
+
 .standings-table-container {
   overflow-x: auto;
   margin-bottom: 2rem;

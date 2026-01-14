@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link, useLoaderData } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { calculateStandings } from "~/lib/tournament.server";
@@ -38,11 +39,26 @@ export async function loader({ request }: Route.LoaderArgs) {
     (matches as MatchWithPlayers[]) || []
   );
 
-  return { standings };
+  // Get unique departments for filter
+  const departments = [
+    ...new Set(
+      (players as Player[])
+        ?.map((p) => p.department)
+        .filter((d): d is string => d !== null)
+    ),
+  ].sort();
+
+  return { standings, departments };
 }
 
 export default function Standings() {
-  const { standings } = useLoaderData<typeof loader>();
+  const { standings, departments } = useLoaderData<typeof loader>();
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+
+  const filteredStandings = useMemo(() => {
+    if (!selectedDepartment) return standings;
+    return standings.filter((s) => s.player.department === selectedDepartment);
+  }, [standings, selectedDepartment]);
 
   return (
     <main className="page">
@@ -51,8 +67,31 @@ export default function Standings() {
         <p>Top 10 qualify for playoffs. 1st and 2nd get byes to semifinals.</p>
       </div>
 
-      {standings.length === 0 ? (
-        <p className="empty">No players registered yet.</p>
+      {departments.length > 0 && (
+        <div className="filter-bar">
+          <label htmlFor="department-filter">Department:</label>
+          <select
+            id="department-filter"
+            value={selectedDepartment}
+            onChange={(e) => setSelectedDepartment(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">All departments</option>
+            {departments.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {filteredStandings.length === 0 ? (
+        <p className="empty">
+          {standings.length === 0
+            ? "No players registered yet."
+            : "No players in this department."}
+        </p>
       ) : (
         <div className="standings-table-container">
           <table className="data-table standings-table">
@@ -70,7 +109,7 @@ export default function Standings() {
               </tr>
             </thead>
             <tbody>
-              {standings.map((standing) => (
+              {filteredStandings.map((standing) => (
                 <tr
                   key={standing.player.id}
                   className={getRowClass(standing.rank)}
