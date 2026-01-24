@@ -13,7 +13,8 @@ export function Header({ user }: HeaderProps) {
     <header className="header">
       <div className="header-container">
         <Link to="/" className="header-logo">
-          PD Table Tennis
+          <span role="img" aria-label="table tennis">🏓</span>
+          PD
         </Link>
 
         <nav className="header-nav">
