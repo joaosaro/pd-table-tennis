@@ -86,6 +86,10 @@ export default function AdminIndex() {
             <h3>Manage Users</h3>
             <p>Assign roles to users</p>
           </Link>
+          <Link to="/admin/recommendations" className="action-card">
+            <h3>Match Suggestions</h3>
+            <p>Generate weekly match recommendations</p>
+          </Link>
         </div>
       </div>
 

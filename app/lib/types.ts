@@ -77,6 +77,22 @@ export interface AppUser {
   playerId: string | null;
 }
 
+// Weekly recommendations
+export interface WeeklyRecommendation {
+  id: string;
+  week_date: string;
+  player1_id: string;
+  player2_id: string;
+  is_extra_match: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface WeeklyRecommendationWithPlayers extends WeeklyRecommendation {
+  player1: Player;
+  player2: Player;
+}
+
 // Standings calculation
 export interface PlayerStanding {
   player: Player;

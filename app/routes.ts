@@ -9,6 +9,7 @@ export default [
   route("player/:id", "routes/player.$id.tsx"),
   route("match/:id", "routes/match.$id.tsx"),
   route("bracket", "routes/bracket.tsx"),
+  route("recommendations", "routes/recommendations.tsx"),
 
   // Auth routes
   route("login", "routes/auth/login.tsx"),
@@ -31,4 +32,5 @@ export default [
   route("admin/settings", "routes/admin/settings.tsx"),
   route("admin/users", "routes/admin/users.tsx"),
   route("admin/export-results", "routes/admin/export-results.tsx"),
+  route("admin/recommendations", "routes/admin/recommendations.tsx"),
 ] satisfies RouteConfig;

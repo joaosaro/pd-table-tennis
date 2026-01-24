@@ -213,9 +213,9 @@ export default function Home() {
           <h3>Results</h3>
           <p>See all matches and results</p>
         </Link>
-        <Link to="/bracket" className="quick-link-card">
-          <h3>Bracket</h3>
-          <p>View knockout bracket</p>
+        <Link to="/recommendations" className="quick-link-card">
+          <h3>Match Suggestions</h3>
+          <p>This week&apos;s recommended matches</p>
         </Link>
         <Link
           to="/editor/matches"

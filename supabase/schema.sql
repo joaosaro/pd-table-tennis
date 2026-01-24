@@ -63,18 +63,32 @@ CREATE TABLE IF NOT EXISTS matches (
   CONSTRAINT different_players CHECK (player1_id != player2_id)
 );
 
+-- Weekly match recommendations
+CREATE TABLE IF NOT EXISTS weekly_recommendations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  week_date DATE NOT NULL,
+  player1_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  player2_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  is_extra_match BOOLEAN DEFAULT false,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT different_recommendation_players CHECK (player1_id != player2_id)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_matches_player1 ON matches(player1_id);
 CREATE INDEX IF NOT EXISTS idx_matches_player2 ON matches(player2_id);
 CREATE INDEX IF NOT EXISTS idx_matches_phase ON matches(phase);
 CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status);
 CREATE INDEX IF NOT EXISTS idx_players_tier ON players(tier);
+CREATE INDEX IF NOT EXISTS idx_recommendations_week_date ON weekly_recommendations(week_date);
 
 -- Enable Row Level Security
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tournament_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE weekly_recommendations ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 
@@ -139,6 +153,20 @@ CREATE POLICY "Anyone can view tournament settings" ON tournament_settings
 
 CREATE POLICY "Admins can update tournament settings" ON tournament_settings
   FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+  );
+
+-- Weekly recommendations: Public read, Admin write
+CREATE POLICY "Anyone can view recommendations" ON weekly_recommendations
+  FOR SELECT USING (true);
+
+CREATE POLICY "Admins can insert recommendations" ON weekly_recommendations
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Admins can delete recommendations" ON weekly_recommendations
+  FOR DELETE USING (
     EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
   );
 
