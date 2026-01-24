@@ -72,11 +72,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     (leagueMatches as MatchWithPlayers[]) || []
   );
 
+  // Calculate unique players who have played at least one league match
+  const playersWhoPlayed = new Set(
+    (leagueMatches || []).flatMap((m) => [m.player1_id, m.player2_id])
+  ).size;
+
   return {
     settings: settings as TournamentSettings | null,
     playerCount: (players || []).length,
     totalMatches: totalMatches || 0,
     completedMatches: completedMatches || 0,
+    playersWhoPlayed,
     recentMatches: (recentMatches as MatchWithPlayers[]) || [],
     standings: standings.slice(0, 10), // Top 10 for minimal view
   };
@@ -86,14 +92,11 @@ export default function Home() {
   const {
     settings,
     playerCount,
-    totalMatches,
     completedMatches,
+    playersWhoPlayed,
     recentMatches,
     standings,
   } = useLoaderData<typeof loader>();
-
-  const progress =
-    totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
 
   return (
     <main className="home-page">
@@ -114,16 +117,19 @@ export default function Home() {
           <span className="stat-label">Players</span>
         </div>
         <div className="stat-card">
+          <span className="stat-value">{playersWhoPlayed}</span>
+          <span className="stat-label">Players Active</span>
+        </div>
+        <div className="stat-card">
           <span className="stat-value">{completedMatches}</span>
           <span className="stat-label">Matches Played</span>
         </div>
         <div className="stat-card">
-          <span className="stat-value">{totalMatches - completedMatches}</span>
-          <span className="stat-label">Remaining</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-value">{progress}%</span>
-          <span className="stat-label">Progress</span>
+          <span className="stat-value">
+            {Math.floor((playerCount * (playerCount - 1)) / 2) -
+              completedMatches}
+          </span>
+          <span className="stat-label">Available to Play</span>
         </div>
       </section>
 
@@ -211,7 +217,10 @@ export default function Home() {
           <h3>Bracket</h3>
           <p>View knockout bracket</p>
         </Link>
-        <Link to="/editor/matches" className="quick-link-card quick-link-card--cta">
+        <Link
+          to="/editor/matches"
+          className="quick-link-card quick-link-card--cta"
+        >
           <h3>Submit Results</h3>
           <p>Record your match scores</p>
         </Link>
