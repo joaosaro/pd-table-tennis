@@ -64,7 +64,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     )
     .eq("status", "completed")
     .order("recorded_at", { ascending: false })
-    .limit(5);
+    .limit(7);
 
   // Calculate standings
   const standings = calculateStandings(
