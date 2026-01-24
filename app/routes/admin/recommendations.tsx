@@ -10,11 +10,7 @@ import type { Route } from "./+types/recommendations";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { requireRole } from "~/lib/auth.server";
 import { generateRecommendations } from "~/lib/recommendations.server";
-import type {
-  Match,
-  Player,
-  WeeklyRecommendationWithPlayers,
-} from "~/lib/types";
+import type { Player, WeeklyRecommendationWithPlayers } from "~/lib/types";
 
 export function meta() {
   return [{ title: "Match Suggestions | PD Table Tennis" }];
@@ -29,13 +25,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     .from("players")
     .select("*")
     .order("name");
-
-  // Fetch completed league matches
-  const { data: leagueMatches } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("phase", "league")
-    .eq("status", "completed");
 
   // Fetch current recommendations
   const { data: recommendations } = await supabase
@@ -58,7 +47,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   return data(
     {
       players: (players as Player[]) || [],
-      leagueMatches: (leagueMatches as Match[]) || [],
       currentRecommendations:
         currentRecommendations as WeeklyRecommendationWithPlayers[],
       latestWeekDate,
@@ -94,18 +82,8 @@ export async function action({ request }: Route.ActionArgs) {
       .select("*")
       .in("id", playerIds);
 
-    // Fetch completed league matches
-    const { data: leagueMatches } = await supabase
-      .from("matches")
-      .select("*")
-      .eq("phase", "league")
-      .eq("status", "completed");
-
-    // Generate recommendations
-    const recommendations = generateRecommendations(
-      (players as Player[]) || [],
-      (leagueMatches as Match[]) || []
-    );
+    // Generate recommendations (random pairing)
+    const recommendations = generateRecommendations((players as Player[]) || []);
 
     // Delete existing recommendations
     await supabase.from("weekly_recommendations").delete().neq("id", "");
@@ -168,8 +146,8 @@ export default function AdminRecommendations() {
     <div className="admin-page">
       <h1>Match Suggestions</h1>
       <p className="help-text">
-        Generate weekly match suggestions for players. The algorithm prioritizes
-        pairing players who haven&apos;t played each other yet.
+        Generate weekly match suggestions for players. Players are randomly
+        paired from the selected list.
       </p>
 
       {actionData?.error && (
