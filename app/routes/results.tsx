@@ -1,6 +1,11 @@
-import { Link, useLoaderData, useOutletContext, useSearchParams } from "react-router";
+import {
+  Link,
+  useLoaderData,
+  useOutletContext,
+  useSearchParams,
+} from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { MatchWithPlayers, AppUser } from "~/lib/types";
+import type { AppUser, MatchWithPlayers } from "~/lib/types";
 import type { Route } from "./+types/results";
 
 export function meta() {
@@ -30,9 +35,9 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `
+    `,
     )
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
 
   if (status !== "all") {
     query = query.eq("status", status);
