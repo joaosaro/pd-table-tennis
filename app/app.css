@@ -2809,6 +2809,55 @@ body {
    Weekly Recommendations Styles
    =========================================== */
 
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0 1.5rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.tab-button {
+  background: var(--color-gray-100);
+  border: 1px solid var(--color-gray-200);
+  color: var(--color-gray-700);
+  padding: 0.5rem 0.875rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  flex: 1;
+  text-align: center;
+}
+
+.tab-button:hover {
+  border-color: var(--color-gray-300);
+}
+
+.tab-button.is-active {
+  background: var(--color-gray-900);
+  color: white;
+  border-color: var(--color-gray-900);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab-button {
+    border-color: var(--color-gray-700);
+    color: var(--color-gray-200);
+    background: var(--color-gray-800);
+  }
+
+  .tab-button:hover {
+    border-color: var(--color-gray-600);
+  }
+
+  .tab-button.is-active {
+    background: var(--color-gray-100);
+    color: var(--color-gray-950);
+    border-color: var(--color-gray-100);
+  }
+}
+
 /* Player checkbox grid for recommendations */
 .player-checkbox-grid {
   display: grid;
