@@ -533,6 +533,12 @@ body {
   font-size: 1.125rem;
 }
 
+.hero-actions {
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: center;
+}
+
 .deadline {
   margin-top: 1rem;
   color: var(--color-warning);

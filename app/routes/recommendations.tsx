@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useLoaderData } from "react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useLoaderData, useSearchParams } from "react-router";
 import {
   generateUnplayedLeagueMatchups,
   type MatchPairInput,
@@ -62,7 +62,15 @@ export default function Recommendations() {
   const { recommendations, weekDate, players, completedMatches } =
     useLoaderData<typeof loader>();
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"weekly" | "custom">("weekly");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") === "custom" ? "custom" : "weekly";
+  const [activeTab, setActiveTab] = useState<"weekly" | "custom">(initialTab);
+
+  useEffect(() => {
+    const nextTab =
+      searchParams.get("tab") === "custom" ? "custom" : "weekly";
+    setActiveTab(nextTab);
+  }, [searchParams]);
 
   const selectedPlayers = useMemo(() => {
     if (selectedPlayerIds.length === 0) return [];
@@ -86,6 +94,13 @@ export default function Recommendations() {
     );
   };
 
+  const setTab = (tab: "weekly" | "custom") => {
+    setActiveTab(tab);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("tab", tab);
+    setSearchParams(nextParams, { replace: true });
+  };
+
   return (
     <main className="page">
       <div className="page-header">
@@ -101,14 +116,14 @@ export default function Recommendations() {
         <button
           type="button"
           className={`tab-button ${activeTab === "weekly" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("weekly")}
+          onClick={() => setTab("weekly")}
         >
           App Weekly Recommendations
         </button>
         <button
           type="button"
           className={`tab-button ${activeTab === "custom" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("custom")}
+          onClick={() => setTab("custom")}
         >
           Custom Match Finder
         </button>
@@ -116,7 +131,16 @@ export default function Recommendations() {
 
       {activeTab === "weekly" ? (
         <section className="admin-section">
-          <h2>This Week&apos;s Recommendations</h2>
+          <div className="section-header">
+            <h2>This Week&apos;s Recommendations</h2>
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              onClick={() => setTab("custom")}
+            >
+              Try Match Finder
+            </button>
+          </div>
           {recommendations.length === 0 ? (
             <div className="empty-state">
               <p>No match suggestions available yet.</p>
