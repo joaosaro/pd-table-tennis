@@ -22,7 +22,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: players } = await supabase
     .from("players")
-    .select("id, name, tier")
+    .select("id, name, tier, slack_handle")
     .order("name");
 
   // Get recommendations with player data
@@ -62,6 +62,7 @@ export default function Recommendations() {
   const { recommendations, weekDate, players, completedMatches } =
     useLoaderData<typeof loader>();
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const [copiedTab, setCopiedTab] = useState<"weekly" | "custom" | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") === "custom" ? "custom" : "weekly";
   const [activeTab, setActiveTab] = useState<"weekly" | "custom">(initialTab);
@@ -86,6 +87,26 @@ export default function Recommendations() {
     );
   }, [completedMatches, selectedPlayers]);
 
+  const weeklyCopyText = useMemo(() => {
+    if (!recommendations.length) return "";
+    return recommendations
+      .map(
+        (rec) =>
+          `${formatSlackLabel(rec.player1)} vs ${formatSlackLabel(rec.player2)}`
+      )
+      .join("\n");
+  }, [recommendations]);
+
+  const customCopyText = useMemo(() => {
+    if (!suggestedMatches.length) return "";
+    return suggestedMatches
+      .map(
+        (match) =>
+          `${formatSlackLabel(match.player1)} vs ${formatSlackLabel(match.player2)}`
+      )
+      .join("\n");
+  }, [suggestedMatches]);
+
   const togglePlayer = (playerId: string) => {
     setSelectedPlayerIds((prev) =>
       prev.includes(playerId)
@@ -99,6 +120,20 @@ export default function Recommendations() {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("tab", tab);
     setSearchParams(nextParams, { replace: true });
+  };
+
+  const copyToClipboard = async (
+    tab: "weekly" | "custom",
+    text: string
+  ) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedTab(tab);
+      window.setTimeout(() => setCopiedTab(null), 2000);
+    } catch (error) {
+      console.error("Failed to copy matches", error);
+    }
   };
 
   return (
@@ -149,33 +184,41 @@ export default function Recommendations() {
               </p>
             </div>
           ) : (
-            <div className="recommendations-grid">
-              {recommendations.map((rec) => (
-                <div
-                  key={rec.id}
-                  className={`recommendation-card ${rec.is_extra_match ? "extra-match" : ""}`}
-                >
-                  <div className="recommendation-players">
-                    <span className="player-name">
-                      {rec.player1.name}
-                      <span className={`tier-badge tier-${rec.player1.tier}`}>
-                        {rec.player1.tier}
+            <>
+              <div className="recommendations-grid">
+                {recommendations.map((rec) => (
+                  <div
+                    key={rec.id}
+                    className={`recommendation-card ${rec.is_extra_match ? "extra-match" : ""}`}
+                  >
+                    <div className="recommendation-players">
+                      <span className="player-name">
+                        {rec.player1.name}
+                        <span className={`tier-badge tier-${rec.player1.tier}`}>
+                          {rec.player1.tier}
+                        </span>
                       </span>
-                    </span>
-                    <span className="vs">vs</span>
-                    <span className="player-name">
-                      {rec.player2.name}
-                      <span className={`tier-badge tier-${rec.player2.tier}`}>
-                        {rec.player2.tier}
+                      <span className="vs">vs</span>
+                      <span className="player-name">
+                        {rec.player2.name}
+                        <span className={`tier-badge tier-${rec.player2.tier}`}>
+                          {rec.player2.tier}
+                        </span>
                       </span>
-                    </span>
+                    </div>
+                    {rec.is_extra_match && (
+                      <span className="extra-badge">Extra</span>
+                    )}
                   </div>
-                  {rec.is_extra_match && (
-                    <span className="extra-badge">Extra</span>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <CopyBlock
+                text={weeklyCopyText}
+                onCopy={() => copyToClipboard("weekly", weeklyCopyText)}
+                copied={copiedTab === "weekly"}
+                title="Copy for Slack"
+              />
+            </>
           )}
         </section>
       ) : (
@@ -222,41 +265,105 @@ export default function Recommendations() {
               </p>
             </div>
           ) : (
-            <div className="recommendations-grid">
-              {suggestedMatches.map((match) => (
-                <div
-                  key={`${match.player1.id}-${match.player2.id}`}
-                  className="recommendation-card"
-                >
-                  <div className="recommendation-players">
-                    <span className="player-name">
-                      {match.player1.name}
-                      {match.player1.tier ? (
-                        <span
-                          className={`tier-badge tier-${match.player1.tier}`}
-                        >
-                          {match.player1.tier}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="vs">vs</span>
-                    <span className="player-name">
-                      {match.player2.name}
-                      {match.player2.tier ? (
-                        <span
-                          className={`tier-badge tier-${match.player2.tier}`}
-                        >
-                          {match.player2.tier}
-                        </span>
-                      ) : null}
-                    </span>
+            <>
+              <div className="recommendations-grid">
+                {suggestedMatches.map((match) => (
+                  <div
+                    key={`${match.player1.id}-${match.player2.id}`}
+                    className="recommendation-card"
+                  >
+                    <div className="recommendation-players">
+                      <span className="player-name">
+                        {match.player1.name}
+                        {match.player1.tier ? (
+                          <span
+                            className={`tier-badge tier-${match.player1.tier}`}
+                          >
+                            {match.player1.tier}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="vs">vs</span>
+                      <span className="player-name">
+                        {match.player2.name}
+                        {match.player2.tier ? (
+                          <span
+                            className={`tier-badge tier-${match.player2.tier}`}
+                          >
+                            {match.player2.tier}
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <CopyBlock
+                text={customCopyText}
+                onCopy={() => copyToClipboard("custom", customCopyText)}
+                copied={copiedTab === "custom"}
+                title="Copy for Slack"
+              />
+            </>
           )}
         </section>
       )}
     </main>
+  );
+}
+
+function formatSlackLabel(player: {
+  name: string;
+  slack_handle?: string | null;
+}) {
+  return player.slack_handle ? `@${player.slack_handle}` : player.name;
+}
+
+function CopyBlock({
+  text,
+  onCopy,
+  copied,
+  title,
+}: {
+  text: string;
+  onCopy: () => void;
+  copied: boolean;
+  title: string;
+}) {
+  const rows = Math.min(8, Math.max(3, text.split("\n").length));
+
+  return (
+    <div className="copy-block">
+      <div className="copy-header">
+        <h3>{title}</h3>
+        <button
+          type="button"
+          className="copy-button"
+          onClick={onCopy}
+          aria-label="Copy to clipboard"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="copy-icon"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          <span>{copied ? "Copied" : "Copy"}</span>
+        </button>
+      </div>
+      <textarea
+        className="copy-textarea"
+        readOnly
+        value={text}
+        rows={rows}
+      />
+    </div>
   );
 }

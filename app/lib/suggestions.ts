@@ -1,6 +1,7 @@
 export type PlayerSummary = {
   id: string;
   name: string;
+  slack_handle?: string | null;
   tier?: number | null;
 };
 
