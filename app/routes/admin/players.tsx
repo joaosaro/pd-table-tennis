@@ -59,6 +59,7 @@ export default function AdminPlayers() {
             <tr>
               <th>Name</th>
               <th>Department</th>
+              <th>Slack</th>
               <th className="text-center">Tier</th>
               <th className="text-right">Actions</th>
             </tr>
@@ -70,6 +71,7 @@ export default function AdminPlayers() {
                   <Link to={`/player/${player.id}`}>{player.name}</Link>
                 </td>
                 <td>{player.department || "-"}</td>
+                <td>{player.slack_handle ? `@${player.slack_handle}` : "-"}</td>
                 <td className="text-center">
                   <span className={`tier-badge tier-${player.tier}`}>
                     {player.tier}

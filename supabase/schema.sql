@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS players (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   department TEXT,
+  slack_handle TEXT,
   tier INTEGER NOT NULL DEFAULT 4 CHECK (tier >= 1 AND tier <= 4),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -81,6 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_matches_player2 ON matches(player2_id);
 CREATE INDEX IF NOT EXISTS idx_matches_phase ON matches(phase);
 CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status);
 CREATE INDEX IF NOT EXISTS idx_players_tier ON players(tier);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_players_slack_handle ON players(slack_handle);
 CREATE INDEX IF NOT EXISTS idx_recommendations_week_date ON weekly_recommendations(week_date);
 
 -- Enable Row Level Security

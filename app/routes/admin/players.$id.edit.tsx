@@ -34,6 +34,8 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const name = (formData.get("name") as string)?.trim();
   const department = (formData.get("department") as string)?.trim() || null;
+  const slackHandleRaw = (formData.get("slack_handle") as string) || "";
+  const slack_handle = normalizeSlackHandle(slackHandleRaw);
   const tier = parseInt(formData.get("tier") as string) || 4;
 
   if (!name) {
@@ -42,7 +44,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { error } = await supabase
     .from("players")
-    .update({ name, department, tier })
+    .update({ name, department, slack_handle, tier })
     .eq("id", params.id);
 
   if (error) {
@@ -99,6 +101,21 @@ export default function AdminPlayersEdit() {
         </div>
 
         <div className="form-group">
+          <label htmlFor="slack_handle" className="form-label">
+            Slack handle
+          </label>
+          <input
+            type="text"
+            id="slack_handle"
+            name="slack_handle"
+            className="form-input"
+            defaultValue={player.slack_handle || ""}
+            placeholder="e.g. joaosaro"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <div className="form-group">
           <label htmlFor="tier" className="form-label">
             Tier
           </label>
@@ -131,4 +148,11 @@ export default function AdminPlayersEdit() {
       </Form>
     </div>
   );
+}
+
+function normalizeSlackHandle(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const withoutAt = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
+  return withoutAt.trim().toLowerCase() || null;
 }

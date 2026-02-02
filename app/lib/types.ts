@@ -15,6 +15,7 @@ export interface Player {
   id: string;
   name: string;
   department: string | null;
+  slack_handle: string | null;
   tier: 1 | 2 | 3 | 4;
   created_at: string;
   updated_at: string;
