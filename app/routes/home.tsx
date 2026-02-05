@@ -1,7 +1,12 @@
-import { Link, useLoaderData } from "react-router";
+import { Link, useLoaderData, useOutletContext } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { calculateStandings } from "~/lib/tournament.server";
-import type { MatchWithPlayers, Player, TournamentSettings } from "~/lib/types";
+import type {
+  AppUser,
+  MatchWithPlayers,
+  Player,
+  TournamentSettings,
+} from "~/lib/types";
 import type { Route } from "./+types/home";
 
 export function meta() {
@@ -97,6 +102,8 @@ export default function Home() {
     recentMatches,
     standings,
   } = useLoaderData<typeof loader>();
+  const { user } = useOutletContext<{ user: AppUser | null }>();
+  const canEdit = user?.role === "admin" || user?.role === "editor";
 
   return (
     <main className="home-page">
@@ -222,13 +229,15 @@ export default function Home() {
           <h3>Match Suggestions</h3>
           <p>This week&apos;s recommended matches</p>
         </Link>
-        <Link
-          to="/editor/matches"
-          className="quick-link-card quick-link-card--cta"
-        >
-          <h3>Submit Results</h3>
-          <p>Record your match scores</p>
-        </Link>
+        {canEdit && (
+          <Link
+            to="/editor/matches"
+            className="quick-link-card quick-link-card--cta"
+          >
+            <h3>Submit Results</h3>
+            <p>Record your match scores</p>
+          </Link>
+        )}
       </section>
     </main>
   );
