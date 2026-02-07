@@ -110,11 +110,6 @@ export default function Home() {
       <section className="hero">
         <h1>{settings?.name || "PD Table Tennis"}</h1>
         <p className="hero-subtitle">Pipedrive Table Tennis Tournament</p>
-        <div className="hero-actions">
-          <Link to="/recommendations?tab=custom" className="btn btn-primary">
-            Try Match Finder
-          </Link>
-        </div>
         {settings?.league_deadline && (
           <p className="deadline">
             League deadline:{" "}
