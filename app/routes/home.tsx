@@ -39,7 +39,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `
+    `,
     )
     .eq("phase", "league")
     .eq("status", "completed");
@@ -65,7 +65,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*),
       winner:players!matches_winner_id_fkey(*)
-    `
+    `,
     )
     .eq("status", "completed")
     .order("recorded_at", { ascending: false })
@@ -74,12 +74,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Calculate standings
   const standings = calculateStandings(
     (players as Player[]) || [],
-    (leagueMatches as MatchWithPlayers[]) || []
+    (leagueMatches as MatchWithPlayers[]) || [],
   );
 
   // Calculate unique players who have played at least one league match
   const playersWhoPlayed = new Set(
-    (leagueMatches || []).flatMap((m) => [m.player1_id, m.player2_id])
+    (leagueMatches || []).flatMap((m) => [m.player1_id, m.player2_id]),
   ).size;
 
   return {
@@ -227,7 +227,7 @@ export default function Home() {
         </Link>
         <Link to="/recommendations" className="quick-link-card">
           <h3>Match Suggestions</h3>
-          <p>This week&apos;s recommended matches</p>
+          <p>Try match finder</p>
         </Link>
         {canEdit && (
           <Link
