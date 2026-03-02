@@ -98,54 +98,102 @@ export function calculateStandings(
     s.pointDiff = s.pointsScored - s.pointsConceded;
   }
 
-  // Sort standings with tiebreakers
-  standings.sort((a, b) => {
-    // 1. Points (descending)
-    if (b.points !== a.points) {
-      return b.points - a.points;
-    }
+  // Sort standings with cascading tiebreakers applied only among tied players
+  const criteria = [
+    {
+      key: (s: PlayerStanding) => s.points,
+      desc: true,
+    },
+    {
+      key: (s: PlayerStanding, groupIds: Set<string>) =>
+        getHeadToHeadWins(s.player.id, groupIds, headToHead),
+      desc: true,
+    },
+    {
+      key: (s: PlayerStanding) => s.matchesPlayed,
+      desc: true,
+    },
+    {
+      key: (s: PlayerStanding) => s.setDiff,
+      desc: true,
+    },
+    {
+      key: (s: PlayerStanding) => s.pointsScored,
+      desc: true,
+    },
+  ];
 
-    // 2. Head-to-head
-    const h2hResult = getHeadToHeadResult(a.player.id, b.player.id, headToHead);
-    if (h2hResult !== 0) {
-      return h2hResult;
-    }
-
-    // 3. Matches played (descending)
-    if (b.matchesPlayed !== a.matchesPlayed) {
-      return b.matchesPlayed - a.matchesPlayed;
-    }
-
-    // 4. Set difference (descending)
-    if (b.setDiff !== a.setDiff) {
-      return b.setDiff - a.setDiff;
-    }
-
-    // 5. Points scored (descending)
-    return b.pointsScored - a.pointsScored;
-  });
+  const sortedStandings = sortByCriteria(standings, criteria);
 
   // Assign ranks
-  standings.forEach((s, i) => {
+  sortedStandings.forEach((s, i) => {
     s.rank = i + 1;
   });
 
-  return standings;
+  return sortedStandings;
 }
 
 /**
- * Get head-to-head comparison result.
- * Returns positive if player B wins, negative if player A wins, 0 if tied.
+ * Get total head-to-head wins within a tied group (mini-table).
  */
-function getHeadToHeadResult(
-  playerAId: string,
-  playerBId: string,
+function getHeadToHeadWins(
+  playerId: string,
+  groupIds: Set<string>,
   headToHead: Map<string, Map<string, number>>
 ): number {
-  const aWinsOverB = headToHead.get(playerAId)?.get(playerBId) || 0;
-  const bWinsOverA = headToHead.get(playerBId)?.get(playerAId) || 0;
+  const winsMap = headToHead.get(playerId);
+  if (!winsMap) return 0;
 
-  return bWinsOverA - aWinsOverB;
+  let wins = 0;
+  for (const otherId of groupIds) {
+    if (otherId === playerId) continue;
+    wins += winsMap.get(otherId) || 0;
+  }
+
+  return wins;
+}
+
+/**
+ * Sort standings by cascading criteria, applying each tiebreaker only to tied players.
+ */
+function sortByCriteria(
+  list: PlayerStanding[],
+  criteria: {
+    key: (s: PlayerStanding, groupIds: Set<string>) => number;
+    desc: boolean;
+  }[]
+): PlayerStanding[] {
+  if (criteria.length === 0) return list;
+
+  const [criterion, ...rest] = criteria;
+  const groupIds = new Set(list.map((s) => s.player.id));
+  const buckets = new Map<number, PlayerStanding[]>();
+
+  for (const s of list) {
+    const key = criterion.key(s, groupIds);
+    const bucket = buckets.get(key);
+    if (bucket) {
+      bucket.push(s);
+    } else {
+      buckets.set(key, [s]);
+    }
+  }
+
+  const keys = Array.from(buckets.keys()).sort((a, b) =>
+    criterion.desc ? b - a : a - b
+  );
+
+  const result: PlayerStanding[] = [];
+  for (const key of keys) {
+    const bucket = buckets.get(key)!;
+    if (bucket.length > 1 && rest.length > 0) {
+      result.push(...sortByCriteria(bucket, rest));
+    } else {
+      result.push(...bucket);
+    }
+  }
+
+  return result;
 }
 
 /**

@@ -83,7 +83,7 @@ Points awarded based on defeated opponent's tier:
 
 ### Standings Tiebreaker
 1. Total points
-2. Head-to-head result
+2. Head-to-head result (mini-table among tied players)
 3. Matches played
 4. Set differential
 5. Total points scored
