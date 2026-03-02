@@ -1631,6 +1631,33 @@ body {
   gap: 0.5rem;
 }
 
+.standings-tiebreak {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 0.5rem;
+  background: white;
+}
+
+.standings-tiebreak h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+}
+
+.standings-tiebreak ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.375rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .standings-tiebreak {
+    background: var(--color-gray-800);
+    border-color: var(--color-gray-700);
+  }
+}
+
 .hide-mobile {
   display: table-cell;
 }

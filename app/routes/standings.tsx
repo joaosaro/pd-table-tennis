@@ -167,6 +167,17 @@ export default function Standings() {
           <span>Eliminated</span>
         </div>
       </div>
+
+      <section className="standings-tiebreak">
+        <h2>Tie-break rules</h2>
+        <ol>
+          <li>Higher league points</li>
+          <li>Head-to-head wins (only among tied players)</li>
+          <li>More matches played</li>
+          <li>Better set difference</li>
+          <li>More total points scored (in sets)</li>
+        </ol>
+      </section>
     </main>
   );
 }
