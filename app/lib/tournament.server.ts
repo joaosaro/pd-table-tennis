@@ -3,7 +3,7 @@ import { TIER_POINTS } from "./types";
 
 /**
  * Calculate league standings from players and matches.
- * Includes tiebreaker logic: Points → Head-to-head → Set diff → Points scored
+ * Includes tiebreaker logic: Points → Head-to-head → Matches played → Set diff → Points scored
  */
 export function calculateStandings(
   players: Player[],
@@ -111,12 +111,17 @@ export function calculateStandings(
       return h2hResult;
     }
 
-    // 3. Set difference (descending)
+    // 3. Matches played (descending)
+    if (b.matchesPlayed !== a.matchesPlayed) {
+      return b.matchesPlayed - a.matchesPlayed;
+    }
+
+    // 4. Set difference (descending)
     if (b.setDiff !== a.setDiff) {
       return b.setDiff - a.setDiff;
     }
 
-    // 4. Points scored (descending)
+    // 5. Points scored (descending)
     return b.pointsScored - a.pointsScored;
   });
 

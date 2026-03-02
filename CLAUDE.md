@@ -84,8 +84,9 @@ Points awarded based on defeated opponent's tier:
 ### Standings Tiebreaker
 1. Total points
 2. Head-to-head result
-3. Set differential
-4. Total points scored
+3. Matches played
+4. Set differential
+5. Total points scored
 
 ## Deployment
 
