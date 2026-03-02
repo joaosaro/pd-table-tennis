@@ -1644,8 +1644,19 @@ body {
   font-size: 1.125rem;
 }
 
+.standings-tiebreak p {
+  margin: 0 0 0.75rem;
+}
+
 .standings-tiebreak ol {
   margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.375rem;
+}
+
+.standings-tiebreak ul {
+  margin: 0 0 0.75rem;
   padding-left: 1.25rem;
   display: grid;
   gap: 0.375rem;

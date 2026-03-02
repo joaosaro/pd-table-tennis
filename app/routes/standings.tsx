@@ -178,6 +178,28 @@ export default function Standings() {
           <li>More total points scored (in sets)</li>
         </ol>
       </section>
+
+      <section className="standings-tiebreak">
+        <h2>How league points work (2025-based tiers)</h2>
+        <p>
+          This league uses weighted points. You do not get the same points for
+          every win.
+        </p>
+        <p>
+          When you win, your points depend on the tier of the opponent you
+          beat. Tiers are based on 2025 results.
+        </p>
+        <ul>
+          <li>Beat a Tier 1 player: 4 points</li>
+          <li>Beat a Tier 2 player: 3 points</li>
+          <li>Beat a Tier 3 player: 2 points</li>
+          <li>Beat a Tier 4 player: 1 point</li>
+        </ul>
+        <p>
+          If you lose, you get 0 points. This rewards wins against stronger
+          opponents.
+        </p>
+      </section>
     </main>
   );
 }
