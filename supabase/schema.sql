@@ -8,9 +8,17 @@ CREATE TABLE IF NOT EXISTS players (
   department TEXT,
   slack_handle TEXT,
   tier INTEGER NOT NULL DEFAULT 4 CHECK (tier >= 1 AND tier <= 4),
+  disqualified_from_qualification BOOLEAN NOT NULL DEFAULT false,
+  disqualification_note TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE players
+  ADD COLUMN IF NOT EXISTS disqualified_from_qualification BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE players
+  ADD COLUMN IF NOT EXISTS disqualification_note TEXT;
 
 -- Users (authenticated app users, linked to Supabase Auth)
 CREATE TABLE IF NOT EXISTS users (

@@ -17,6 +17,8 @@ export interface Player {
   department: string | null;
   slack_handle: string | null;
   tier: 1 | 2 | 3 | 4;
+  disqualified_from_qualification: boolean;
+  disqualification_note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -108,6 +110,21 @@ export interface PlayerStanding {
   pointsScored: number;
   pointsConceded: number;
   pointDiff: number;
+}
+
+export interface QualificationNote {
+  playerId: string;
+  playerName: string;
+  rank: number;
+  note: string;
+  number: number;
+}
+
+export interface StandingsQualification {
+  semifinalPlayerIds: string[];
+  knockoutPlayerIds: string[];
+  qualifiedPlayerIds: string[];
+  noteEntries: QualificationNote[];
 }
 
 // Set score tuple

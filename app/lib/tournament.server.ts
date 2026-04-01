@@ -1,4 +1,10 @@
-import type { Player, Match, MatchWithPlayers, PlayerStanding } from "./types";
+import type {
+  Match,
+  MatchWithPlayers,
+  Player,
+  PlayerStanding,
+  StandingsQualification,
+} from "./types";
 import { TIER_POINTS } from "./types";
 
 /**
@@ -7,7 +13,7 @@ import { TIER_POINTS } from "./types";
  */
 export function calculateStandings(
   players: Player[],
-  matches: MatchWithPlayers[]
+  matches: MatchWithPlayers[],
 ): PlayerStanding[] {
   // Initialize standings for all players
   const standingsMap = new Map<string, PlayerStanding>();
@@ -31,7 +37,7 @@ export function calculateStandings(
 
   // Process only league matches that are completed
   const leagueMatches = matches.filter(
-    (m) => m.phase === "league" && m.status === "completed"
+    (m) => m.phase === "league" && m.status === "completed",
   );
 
   // Build head-to-head map
@@ -133,13 +139,42 @@ export function calculateStandings(
   return sortedStandings;
 }
 
+export function deriveStandingsQualification(
+  standings: PlayerStanding[],
+): StandingsQualification {
+  const eligibleQualified = standings
+    .filter((standing) => !standing.player.disqualified_from_qualification)
+    .slice(0, 10);
+
+  const noteEntries = standings
+    .filter((standing) => standing.player.disqualified_from_qualification)
+    .map((standing, index) => ({
+      playerId: standing.player.id,
+      playerName: standing.player.name,
+      rank: standing.rank,
+      note: standing.player.disqualification_note || "",
+      number: index + 1,
+    }));
+
+  return {
+    semifinalPlayerIds: eligibleQualified
+      .slice(0, 2)
+      .map((standing) => standing.player.id),
+    knockoutPlayerIds: eligibleQualified
+      .slice(2, 10)
+      .map((standing) => standing.player.id),
+    qualifiedPlayerIds: eligibleQualified.map((standing) => standing.player.id),
+    noteEntries,
+  };
+}
+
 /**
  * Get total head-to-head wins within a tied group (mini-table).
  */
 function getHeadToHeadWins(
   playerId: string,
   groupIds: Set<string>,
-  headToHead: Map<string, Map<string, number>>
+  headToHead: Map<string, Map<string, number>>,
 ): number {
   const winsMap = headToHead.get(playerId);
   if (!winsMap) return 0;
@@ -161,7 +196,7 @@ function sortByCriteria(
   criteria: {
     key: (s: PlayerStanding, groupIds: Set<string>) => number;
     desc: boolean;
-  }[]
+  }[],
 ): PlayerStanding[] {
   if (criteria.length === 0) return list;
 
@@ -180,7 +215,7 @@ function sortByCriteria(
   }
 
   const keys = Array.from(buckets.keys()).sort((a, b) =>
-    criterion.desc ? b - a : a - b
+    criterion.desc ? b - a : a - b,
   );
 
   const result: PlayerStanding[] = [];
@@ -220,7 +255,7 @@ function getSetScores(match: Match): [number, number][] {
  * Each player plays every other player once.
  */
 export function generateLeagueMatchPairs(
-  players: Player[]
+  players: Player[],
 ): [Player, Player][] {
   const pairs: [Player, Player][] = [];
 
@@ -238,13 +273,16 @@ export function generateLeagueMatchPairs(
  * Top 2 get byes to semifinals.
  * 3rd-10th play first round: 3v10, 4v9, 5v8, 6v7.
  */
-export function generateKnockoutMatchups(
-  standings: PlayerStanding[]
-): {
+export function generateKnockoutMatchups(standings: PlayerStanding[]): {
   round1: [PlayerStanding, PlayerStanding][];
   byePlayers: PlayerStanding[];
 } {
-  const qualified = standings.slice(0, 10);
+  const qualification = deriveStandingsQualification(standings);
+  const qualified = qualification.qualifiedPlayerIds
+    .map((playerId) =>
+      standings.find((standing) => standing.player.id === playerId),
+    )
+    .filter((standing): standing is PlayerStanding => Boolean(standing));
   const byePlayers = qualified.slice(0, 2);
 
   // Round 1: 3v10, 4v9, 5v8, 6v7
@@ -263,7 +301,7 @@ export function generateKnockoutMatchups(
  * Reseed by original league rank: best vs worst.
  */
 export function generateRound2Matchups(
-  round1Winners: PlayerStanding[]
+  round1Winners: PlayerStanding[],
 ): [PlayerStanding, PlayerStanding][] {
   // Sort winners by their original rank
   const sorted = [...round1Winners].sort((a, b) => a.rank - b.rank);
@@ -297,19 +335,31 @@ const KNOCKOUT_PROGRESSION: KnockoutProgression[] = [
  */
 export function getKnockoutRoundUpdates(
   allKnockoutMatches: Match[],
-  standings: PlayerStanding[]
+  standings: PlayerStanding[],
 ): {
-  inserts: { player1_id: string; player2_id: string; phase: string; status: string; knockout_position?: number }[];
+  inserts: {
+    player1_id: string;
+    player2_id: string;
+    phase: string;
+    status: string;
+    knockout_position?: number;
+  }[];
   deletes: string[]; // Match IDs to delete
 } {
   const result: {
-    inserts: { player1_id: string; player2_id: string; phase: string; status: string; knockout_position?: number }[];
+    inserts: {
+      player1_id: string;
+      player2_id: string;
+      phase: string;
+      status: string;
+      knockout_position?: number;
+    }[];
     deletes: string[];
   } = { inserts: [], deletes: [] };
 
   for (const progression of KNOCKOUT_PROGRESSION) {
     const phaseMatches = allKnockoutMatches.filter(
-      (m) => m.phase === progression.currentPhase
+      (m) => m.phase === progression.currentPhase,
     );
 
     // Check if we have all expected matches and all are completed
@@ -336,51 +386,67 @@ export function getKnockoutRoundUpdates(
       progression.nextPhase,
       winners,
       standings,
-      allKnockoutMatches
+      allKnockoutMatches,
     );
 
     if (!expectedMatchups) continue;
 
     // Check if next phase already exists
     const nextPhaseMatches = allKnockoutMatches.filter(
-      (m) => m.phase === progression.nextPhase
+      (m) => m.phase === progression.nextPhase,
     );
 
     // Get scheduled matches that might need to be replaced
-    const scheduledMatches = nextPhaseMatches.filter(m => m.status === "scheduled");
+    const scheduledMatches = nextPhaseMatches.filter(
+      (m) => m.status === "scheduled",
+    );
 
     // Helper to check if a matchup already exists in nextPhaseMatches (scheduled OR completed)
-    const matchupExists = (matchup: { player1_id: string; player2_id: string }) =>
-      nextPhaseMatches.some(existing =>
-        (existing.player1_id === matchup.player1_id && existing.player2_id === matchup.player2_id) ||
-        (existing.player1_id === matchup.player2_id && existing.player2_id === matchup.player1_id)
+    const matchupExists = (matchup: {
+      player1_id: string;
+      player2_id: string;
+    }) =>
+      nextPhaseMatches.some(
+        (existing) =>
+          (existing.player1_id === matchup.player1_id &&
+            existing.player2_id === matchup.player2_id) ||
+          (existing.player1_id === matchup.player2_id &&
+            existing.player2_id === matchup.player1_id),
       );
 
     // Find scheduled matches that don't match any expected matchup (stale matches)
-    const staleScheduledMatches = scheduledMatches.filter(existing =>
-      !expectedMatchups.some(expected =>
-        (existing.player1_id === expected.player1_id && existing.player2_id === expected.player2_id) ||
-        (existing.player1_id === expected.player2_id && existing.player2_id === expected.player1_id)
-      )
+    const staleScheduledMatches = scheduledMatches.filter(
+      (existing) =>
+        !expectedMatchups.some(
+          (expected) =>
+            (existing.player1_id === expected.player1_id &&
+              existing.player2_id === expected.player2_id) ||
+            (existing.player1_id === expected.player2_id &&
+              existing.player2_id === expected.player1_id),
+        ),
     );
 
     // Find expected matchups that don't exist yet (need to be created)
-    const missingMatchups = expectedMatchups.filter(expected => !matchupExists(expected));
+    const missingMatchups = expectedMatchups.filter(
+      (expected) => !matchupExists(expected),
+    );
 
     // Delete stale scheduled matches (wrong players due to edited results)
     if (staleScheduledMatches.length > 0) {
-      result.deletes.push(...staleScheduledMatches.map(m => m.id));
+      result.deletes.push(...staleScheduledMatches.map((m) => m.id));
     }
 
     // Insert missing matchups
     if (missingMatchups.length > 0) {
-      result.inserts.push(...missingMatchups.map(m => ({
-        player1_id: m.player1_id,
-        player2_id: m.player2_id,
-        phase: progression.nextPhase,
-        status: "scheduled",
-        knockout_position: m.knockout_position,
-      })));
+      result.inserts.push(
+        ...missingMatchups.map((m) => ({
+          player1_id: m.player1_id,
+          player2_id: m.player2_id,
+          phase: progression.nextPhase,
+          status: "scheduled",
+          knockout_position: m.knockout_position,
+        })),
+      );
     }
   }
 
@@ -395,26 +461,43 @@ function generateNextRoundMatchups(
   phase: string,
   winners: string[],
   standings: PlayerStanding[],
-  allKnockoutMatches: Match[]
-): { player1_id: string; player2_id: string; knockout_position?: number }[] | null {
+  allKnockoutMatches: Match[],
+):
+  | { player1_id: string; player2_id: string; knockout_position?: number }[]
+  | null {
   if (phase === "knockout_r2") {
     // Round 2: Fixed paths based on bracket position
     // Top bracket: pos 1 (3v10) winner vs pos 2 (4v9) winner
     // Bottom bracket: pos 3 (5v8) winner vs pos 4 (6v7) winner
-    const r1Matches = allKnockoutMatches.filter((m) => m.phase === "knockout_r1");
+    const r1Matches = allKnockoutMatches.filter(
+      (m) => m.phase === "knockout_r1",
+    );
 
     const pos1Match = r1Matches.find((m) => m.knockout_position === 1);
     const pos2Match = r1Matches.find((m) => m.knockout_position === 2);
     const pos3Match = r1Matches.find((m) => m.knockout_position === 3);
     const pos4Match = r1Matches.find((m) => m.knockout_position === 4);
 
-    if (!pos1Match?.winner_id || !pos2Match?.winner_id || !pos3Match?.winner_id || !pos4Match?.winner_id) {
+    if (
+      !pos1Match?.winner_id ||
+      !pos2Match?.winner_id ||
+      !pos3Match?.winner_id ||
+      !pos4Match?.winner_id
+    ) {
       return null;
     }
 
     return [
-      { player1_id: pos1Match.winner_id, player2_id: pos2Match.winner_id, knockout_position: 1 }, // Top bracket R2
-      { player1_id: pos3Match.winner_id, player2_id: pos4Match.winner_id, knockout_position: 2 }, // Bottom bracket R2
+      {
+        player1_id: pos1Match.winner_id,
+        player2_id: pos2Match.winner_id,
+        knockout_position: 1,
+      }, // Top bracket R2
+      {
+        player1_id: pos3Match.winner_id,
+        player2_id: pos4Match.winner_id,
+        knockout_position: 2,
+      }, // Bottom bracket R2
     ];
   }
 
@@ -423,18 +506,32 @@ function generateNextRoundMatchups(
     // Semi 1: #1 seed vs top bracket R2 winner (pos 1)
     // Semi 2: #2 seed vs bottom bracket R2 winner (pos 2)
     const byePlayers = standings.slice(0, 2);
-    const r2Matches = allKnockoutMatches.filter((m) => m.phase === "knockout_r2");
+    const r2Matches = allKnockoutMatches.filter(
+      (m) => m.phase === "knockout_r2",
+    );
 
     const topBracketR2 = r2Matches.find((m) => m.knockout_position === 1);
     const bottomBracketR2 = r2Matches.find((m) => m.knockout_position === 2);
 
-    if (!topBracketR2?.winner_id || !bottomBracketR2?.winner_id || byePlayers.length !== 2) {
+    if (
+      !topBracketR2?.winner_id ||
+      !bottomBracketR2?.winner_id ||
+      byePlayers.length !== 2
+    ) {
       return null;
     }
 
     return [
-      { player1_id: byePlayers[0].player.id, player2_id: topBracketR2.winner_id, knockout_position: 1 }, // #1 vs top bracket
-      { player1_id: byePlayers[1].player.id, player2_id: bottomBracketR2.winner_id, knockout_position: 2 }, // #2 vs bottom bracket
+      {
+        player1_id: byePlayers[0].player.id,
+        player2_id: topBracketR2.winner_id,
+        knockout_position: 1,
+      }, // #1 vs top bracket
+      {
+        player1_id: byePlayers[1].player.id,
+        player2_id: bottomBracketR2.winner_id,
+        knockout_position: 2,
+      }, // #2 vs bottom bracket
     ];
   }
 
@@ -453,11 +550,19 @@ function generateNextRoundMatchups(
  */
 export function getNextKnockoutRoundMatches(
   allKnockoutMatches: Match[],
-  standings: PlayerStanding[]
-): { phase: string; matches: { player1_id: string; player2_id: string; phase: string; status: string }[] } | null {
+  standings: PlayerStanding[],
+): {
+  phase: string;
+  matches: {
+    player1_id: string;
+    player2_id: string;
+    phase: string;
+    status: string;
+  }[];
+} | null {
   for (const progression of KNOCKOUT_PROGRESSION) {
     const phaseMatches = allKnockoutMatches.filter(
-      (m) => m.phase === progression.currentPhase
+      (m) => m.phase === progression.currentPhase,
     );
 
     // Check if we have all expected matches and all are completed
@@ -472,7 +577,7 @@ export function getNextKnockoutRoundMatches(
 
     // Check if next phase already exists
     const nextPhaseExists = allKnockoutMatches.some(
-      (m) => m.phase === progression.nextPhase
+      (m) => m.phase === progression.nextPhase,
     );
     if (nextPhaseExists) {
       continue;

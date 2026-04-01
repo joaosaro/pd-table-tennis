@@ -1,6 +1,9 @@
 import { Link, useLoaderData, useOutletContext } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { calculateStandings } from "~/lib/tournament.server";
+import {
+  calculateStandings,
+  deriveStandingsQualification,
+} from "~/lib/tournament.server";
 import type {
   AppUser,
   MatchWithPlayers,
@@ -76,6 +79,14 @@ export async function loader({ request }: Route.LoaderArgs) {
     (players as Player[]) || [],
     (leagueMatches as MatchWithPlayers[]) || [],
   );
+  const qualification = deriveStandingsQualification(standings);
+  const standingsPreviewLimit = Math.max(
+    10,
+    ...qualification.qualifiedPlayerIds.map((playerId) => {
+      const standing = standings.find((entry) => entry.player.id === playerId);
+      return standing?.rank || 0;
+    }),
+  );
 
   // Calculate unique players who have played at least one league match
   const playersWhoPlayed = new Set(
@@ -89,7 +100,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     completedMatches: completedMatches || 0,
     playersWhoPlayed,
     recentMatches: (recentMatches as MatchWithPlayers[]) || [],
-    standings: standings.slice(0, 10), // Top 10 for minimal view
+    standings: standings.slice(0, standingsPreviewLimit),
+    qualification,
   };
 }
 
@@ -101,6 +113,7 @@ export default function Home() {
     playersWhoPlayed,
     recentMatches,
     standings,
+    qualification,
   } = useLoaderData<typeof loader>();
   const { user } = useOutletContext<{ user: AppUser | null }>();
   const canEdit = user?.role === "admin" || user?.role === "editor";
@@ -154,7 +167,10 @@ export default function Home() {
                 <Link
                   key={standing.player.id}
                   to={`/player/${standing.player.id}`}
-                  className={`mini-standing-row ${getRankClass(standing.rank)}`}
+                  className={`mini-standing-row ${getRankClass(
+                    standing.player.id,
+                    qualification,
+                  )}`}
                 >
                   <span className="mini-rank">{standing.rank}</span>
                   <span className="mini-player-name">
@@ -238,9 +254,15 @@ export default function Home() {
   );
 }
 
-function getRankClass(rank: number): string {
-  if (rank <= 2) return "rank-semifinal";
-  if (rank <= 10) return "rank-knockout";
+function getRankClass(
+  playerId: string,
+  qualification: Route.ComponentProps["loaderData"]["qualification"],
+): string {
+  if (qualification.semifinalPlayerIds.includes(playerId)) {
+    return "rank-semifinal";
+  }
+  if (qualification.knockoutPlayerIds.includes(playerId))
+    return "rank-knockout";
   return "";
 }
 

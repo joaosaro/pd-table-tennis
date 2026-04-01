@@ -1,11 +1,20 @@
-import { Form, redirect, useLoaderData, useActionData, useNavigation, data } from "react-router";
-import type { Route } from "./+types/players.$id.edit";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import {
+  data,
+  Form,
+  redirect,
+  useActionData,
+  useLoaderData,
+  useNavigation,
+} from "react-router";
 import { requireRole } from "~/lib/auth.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type { Player } from "~/lib/types";
+import type { Route } from "./+types/players.$id.edit";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: `Edit ${data?.player?.name || "Player"} | PD Table Tennis` }];
+  return [
+    { title: `Edit ${data?.player?.name || "Player"} | PD Table Tennis` },
+  ];
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -37,14 +46,33 @@ export async function action({ request, params }: Route.ActionArgs) {
   const slackHandleRaw = (formData.get("slack_handle") as string) || "";
   const slack_handle = normalizeSlackHandle(slackHandleRaw);
   const tier = parseInt(formData.get("tier") as string) || 4;
+  const disqualifiedFromQualification =
+    formData.get("disqualified_from_qualification") === "on";
+  const disqualificationNote =
+    (formData.get("disqualification_note") as string)?.trim() || null;
 
   if (!name) {
     return { error: "Name is required" };
   }
 
+  if (disqualifiedFromQualification && !disqualificationNote) {
+    return {
+      error: "Disqualification note is required when qualification is disabled",
+    };
+  }
+
   const { error } = await supabase
     .from("players")
-    .update({ name, department, slack_handle, tier })
+    .update({
+      name,
+      department,
+      slack_handle,
+      tier,
+      disqualified_from_qualification: disqualifiedFromQualification,
+      disqualification_note: disqualifiedFromQualification
+        ? disqualificationNote
+        : null,
+    })
     .eq("id", params.id);
 
   if (error) {
@@ -131,6 +159,36 @@ export default function AdminPlayersEdit() {
             <option value="3">Tier 3 (2 pts)</option>
             <option value="4">Tier 4 (Easiest - 1 pt)</option>
           </select>
+        </div>
+
+        <div className="form-group">
+          <label
+            className="form-label"
+            htmlFor="disqualified_from_qualification"
+          >
+            <input
+              type="checkbox"
+              id="disqualified_from_qualification"
+              name="disqualified_from_qualification"
+              defaultChecked={player.disqualified_from_qualification}
+              disabled={isSubmitting}
+            />{" "}
+            Disqualified from qualification
+          </label>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="disqualification_note" className="form-label">
+            Disqualification note
+          </label>
+          <textarea
+            id="disqualification_note"
+            name="disqualification_note"
+            className="form-input"
+            defaultValue={player.disqualification_note || ""}
+            rows={3}
+            disabled={isSubmitting}
+          />
         </div>
 
         <div className="form-actions">

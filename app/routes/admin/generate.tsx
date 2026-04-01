@@ -8,8 +8,11 @@ import {
 } from "react-router";
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { calculateStandings } from "~/lib/tournament.server";
-import type { MatchWithPlayers, Player } from "~/lib/types";
+import {
+  calculateStandings,
+  deriveStandingsQualification,
+} from "~/lib/tournament.server";
+import type { MatchWithPlayers, Player, PlayerStanding } from "~/lib/types";
 import type { Route } from "./+types/generate";
 
 export function meta() {
@@ -35,15 +38,16 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `
+    `,
     )
     .eq("phase", "league")
     .eq("status", "completed");
 
   const standings = calculateStandings(
     (players as Player[]) || [],
-    (leagueMatches as MatchWithPlayers[]) || []
+    (leagueMatches as MatchWithPlayers[]) || [],
   );
+  const qualification = deriveStandingsQualification(standings);
 
   // Calculate league progress
   const totalPossibleMatches = players
@@ -60,9 +64,11 @@ export async function loader({ request }: Route.LoaderArgs) {
         total: totalPossibleMatches,
         remaining: totalPossibleMatches - completedLeagueMatches,
       },
-      canGenerateKnockout: standings.length >= 10 && (knockoutMatchCount || 0) === 0,
+      canGenerateKnockout:
+        qualification.qualifiedPlayerIds.length >= 10 &&
+        (knockoutMatchCount || 0) === 0,
     },
-    { headers }
+    { headers },
   );
 }
 
@@ -82,7 +88,8 @@ export async function action({ request }: Route.ActionArgs) {
 
     if (existingKnockout && existingKnockout > 0) {
       return {
-        error: "Knockout matches already exist. Delete them first to regenerate.",
+        error:
+          "Knockout matches already exist. Delete them first to regenerate.",
       };
     }
 
@@ -95,49 +102,55 @@ export async function action({ request }: Route.ActionArgs) {
         *,
         player1:players!matches_player1_id_fkey(*),
         player2:players!matches_player2_id_fkey(*)
-      `
+      `,
       )
       .eq("phase", "league")
       .eq("status", "completed");
 
     const standings = calculateStandings(
       (players as Player[]) || [],
-      (leagueMatches as MatchWithPlayers[]) || []
+      (leagueMatches as MatchWithPlayers[]) || [],
     );
+    const qualification = deriveStandingsQualification(standings);
+    const qualified = qualification.qualifiedPlayerIds
+      .map((playerId) =>
+        standings.find((standing) => standing.player.id === playerId),
+      )
+      .filter((standing): standing is PlayerStanding => Boolean(standing));
 
-    if (standings.length < 10) {
+    if (qualified.length < 10) {
       return {
         error:
-          "Need at least 10 players with completed matches to generate knockout",
+          "Need at least 10 eligible players with completed matches to generate knockout",
       };
     }
 
     // Generate round 1 matches: 3v10, 4v9, 5v8, 6v7
     const knockoutMatches = [
       {
-        player1_id: standings[2].player.id, // 3rd
-        player2_id: standings[9].player.id, // 10th
+        player1_id: qualified[2]!.player.id, // 3rd eligible
+        player2_id: qualified[9]!.player.id, // 10th eligible
         phase: "knockout_r1",
         status: "scheduled",
         knockout_position: 1,
       },
       {
-        player1_id: standings[3].player.id, // 4th
-        player2_id: standings[8].player.id, // 9th
+        player1_id: qualified[3]!.player.id, // 4th eligible
+        player2_id: qualified[8]!.player.id, // 9th eligible
         phase: "knockout_r1",
         status: "scheduled",
         knockout_position: 2,
       },
       {
-        player1_id: standings[4].player.id, // 5th
-        player2_id: standings[7].player.id, // 8th
+        player1_id: qualified[4]!.player.id, // 5th eligible
+        player2_id: qualified[7]!.player.id, // 8th eligible
         phase: "knockout_r1",
         status: "scheduled",
         knockout_position: 3,
       },
       {
-        player1_id: standings[5].player.id, // 6th
-        player2_id: standings[6].player.id, // 7th
+        player1_id: qualified[5]!.player.id, // 6th eligible
+        player2_id: qualified[6]!.player.id, // 7th eligible
         phase: "knockout_r1",
         status: "scheduled",
         knockout_position: 4,
@@ -187,7 +200,8 @@ export default function AdminGenerate() {
           <div className="generate-stats">
             <p>Players: {playerCount}</p>
             <p>
-              League matches: {leagueProgress.completed} / {leagueProgress.total}
+              League matches: {leagueProgress.completed} /{" "}
+              {leagueProgress.total}
             </p>
             <p>Remaining: {leagueProgress.remaining}</p>
           </div>
@@ -221,7 +235,7 @@ export default function AdminGenerate() {
           )}
           {knockoutMatchCount === 0 && !canGenerateKnockout && (
             <p className="help-text">
-              Need at least 10 players with completed league matches.
+              Need at least 10 eligible players with completed league matches.
             </p>
           )}
         </section>

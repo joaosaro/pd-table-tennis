@@ -845,6 +845,11 @@ body {
   color: white;
 }
 
+.mini-standing-row:not(.rank-semifinal):not(.rank-knockout) .mini-rank {
+  background: var(--color-gray-200);
+  color: inherit;
+}
+
 .mini-player-name {
   flex: 1;
   min-width: 0;
@@ -1561,6 +1566,17 @@ body {
   text-decoration: underline;
 }
 
+.standings-table .player-link.player-link-disqualified {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.standings-note-marker {
+  margin-left: 0.2rem;
+  font-size: 0.7em;
+  vertical-align: top;
+}
+
 .rank-cell {
   width: 3rem;
 }
@@ -1631,6 +1647,31 @@ body {
   gap: 0.5rem;
 }
 
+.legend-disqualified-name {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.standings-notes {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 0.5rem;
+  background: white;
+}
+
+.standings-notes h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+}
+
+.standings-notes ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
 .standings-tiebreak {
   margin-top: 1rem;
   padding: 1rem;
@@ -1673,6 +1714,11 @@ body {
 
 @media (prefers-color-scheme: dark) {
   .standings-tiebreak {
+    background: var(--color-gray-800);
+    border-color: var(--color-gray-700);
+  }
+
+  .standings-notes {
     background: var(--color-gray-800);
     border-color: var(--color-gray-700);
   }

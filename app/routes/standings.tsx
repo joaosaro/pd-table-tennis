@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useLoaderData } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { calculateStandings } from "~/lib/tournament.server";
+import {
+  calculateStandings,
+  deriveStandingsQualification,
+} from "~/lib/tournament.server";
 import type { MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/standings";
 
@@ -29,30 +32,32 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `
+    `,
     )
     .eq("phase", "league")
     .eq("status", "completed");
 
   const standings = calculateStandings(
     (players as Player[]) || [],
-    (matches as MatchWithPlayers[]) || []
+    (matches as MatchWithPlayers[]) || [],
   );
+  const qualification = deriveStandingsQualification(standings);
 
   // Get unique departments for filter
   const departments = [
     ...new Set(
       (players as Player[])
         ?.map((p) => p.department)
-        .filter((d): d is string => d !== null)
+        .filter((d): d is string => d !== null),
     ),
   ].sort();
 
-  return { standings, departments };
+  return { standings, departments, qualification };
 }
 
 export default function Standings() {
-  const { standings, departments } = useLoaderData<typeof loader>();
+  const { standings, departments, qualification } =
+    useLoaderData<typeof loader>();
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
 
   const filteredStandings = useMemo(() => {
@@ -112,11 +117,14 @@ export default function Standings() {
               {filteredStandings.map((standing) => (
                 <tr
                   key={standing.player.id}
-                  className={getRowClass(standing.rank)}
+                  className={getRowClass(standing.player.id, qualification)}
                 >
                   <td className="text-center rank-cell">
                     <span
-                      className={`rank-badge ${getRankClass(standing.rank)}`}
+                      className={`rank-badge ${getRankClass(
+                        standing.player.id,
+                        qualification,
+                      )}`}
                     >
                       {standing.rank}
                     </span>
@@ -124,9 +132,18 @@ export default function Standings() {
                   <td>
                     <Link
                       to={`/player/${standing.player.id}`}
-                      className="player-link"
+                      className={`player-link ${
+                        standing.player.disqualified_from_qualification
+                          ? "player-link-disqualified"
+                          : ""
+                      }`}
                     >
                       {standing.player.name}
+                      {standing.player.disqualified_from_qualification && (
+                        <sup className="standings-note-marker">
+                          {getNoteNumber(standing.player.id, qualification)}
+                        </sup>
+                      )}
                     </Link>
                   </td>
                   <td className="text-center hide-mobile">
@@ -166,7 +183,24 @@ export default function Standings() {
           <span className="rank-badge">Remaining</span>
           <span>Eliminated</span>
         </div>
+        <div className="legend-item">
+          <span className="legend-disqualified-name">Disqualified</span>
+          <span>Stats count, but qualification passes down</span>
+        </div>
       </div>
+
+      {qualification.noteEntries.length > 0 && (
+        <section className="standings-notes">
+          <h2>Disqualification notes</h2>
+          <ol>
+            {qualification.noteEntries.map((entry) => (
+              <li key={entry.playerId}>
+                <strong>{entry.playerName}</strong>: {entry.note}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       <section className="standings-tiebreak">
         <h2>Tie-break rules</h2>
@@ -186,8 +220,8 @@ export default function Standings() {
           every win.
         </p>
         <p>
-          When you win, your points depend on the tier of the opponent you
-          beat. Tiers are based on 2025 results.
+          When you win, your points depend on the tier of the opponent you beat.
+          Tiers are based on 2025 results.
         </p>
         <ul>
           <li>Beat a Tier 1 player: 4 points</li>
@@ -244,14 +278,34 @@ export default function Standings() {
   );
 }
 
-function getRowClass(rank: number): string {
-  if (rank <= 2) return "row-semifinal";
-  if (rank <= 10) return "row-knockout";
+function getRowClass(
+  playerId: string,
+  qualification: Route.ComponentProps["loaderData"]["qualification"],
+): string {
+  if (qualification.semifinalPlayerIds.includes(playerId))
+    return "row-semifinal";
+  if (qualification.knockoutPlayerIds.includes(playerId)) return "row-knockout";
   return "";
 }
 
-function getRankClass(rank: number): string {
-  if (rank <= 2) return "rank-semifinal";
-  if (rank <= 10) return "rank-knockout";
+function getRankClass(
+  playerId: string,
+  qualification: Route.ComponentProps["loaderData"]["qualification"],
+): string {
+  if (qualification.semifinalPlayerIds.includes(playerId)) {
+    return "rank-semifinal";
+  }
+  if (qualification.knockoutPlayerIds.includes(playerId))
+    return "rank-knockout";
   return "";
+}
+
+function getNoteNumber(
+  playerId: string,
+  qualification: Route.ComponentProps["loaderData"]["qualification"],
+): number | null {
+  return (
+    qualification.noteEntries.find((entry) => entry.playerId === playerId)
+      ?.number || null
+  );
 }

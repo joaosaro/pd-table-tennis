@@ -1,6 +1,9 @@
 import { Link, useLoaderData } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { calculateStandings } from "~/lib/tournament.server";
+import {
+  calculateStandings,
+  deriveStandingsQualification,
+} from "~/lib/tournament.server";
 import type { MatchWithPlayers, Player, PlayerStanding } from "~/lib/types";
 import type { Route } from "./+types/bracket";
 
@@ -25,7 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `
+    `,
     )
     .eq("phase", "league")
     .eq("status", "completed");
@@ -45,28 +48,34 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       player1:players!matches_player1_id_fkey(*),
       player2:players!matches_player2_id_fkey(*)
-    `
+    `,
     )
     .neq("phase", "league");
 
   const standings = calculateStandings(
     (players as Player[]) || [],
-    (leagueMatches as MatchWithPlayers[]) || []
+    (leagueMatches as MatchWithPlayers[]) || [],
   );
+  const qualification = deriveStandingsQualification(standings);
 
   return {
     standings,
+    qualification,
     knockoutMatches: (knockoutMatches as MatchWithPlayers[]) || [],
     leagueInProgress: (incompleteLeagueCount ?? 0) > 0,
   };
 }
 
 export default function Bracket() {
-  const { standings, knockoutMatches, leagueInProgress } =
+  const { standings, qualification, knockoutMatches, leagueInProgress } =
     useLoaderData<typeof loader>();
 
   // Get qualified players (top 10)
-  const qualified = standings.slice(0, 10);
+  const qualified = qualification.qualifiedPlayerIds
+    .map((playerId) =>
+      standings.find((standing) => standing.player.id === playerId),
+    )
+    .filter((standing): standing is PlayerStanding => Boolean(standing));
 
   // Organize knockout matches by phase
   const round1 = knockoutMatches.filter((m) => m.phase === "knockout_r1");
@@ -76,10 +85,10 @@ export default function Bracket() {
 
   // Organize matches by bracket path using knockout_position
   const topBracketR1 = round1.filter(
-    (m) => m.knockout_position === 1 || m.knockout_position === 2
+    (m) => m.knockout_position === 1 || m.knockout_position === 2,
   );
   const bottomBracketR1 = round1.filter(
-    (m) => m.knockout_position === 3 || m.knockout_position === 4
+    (m) => m.knockout_position === 3 || m.knockout_position === 4,
   );
   const topBracketR2 = round2.find((m) => m.knockout_position === 1);
   const bottomBracketR2 = round2.find((m) => m.knockout_position === 2);
@@ -126,7 +135,7 @@ export default function Bracket() {
                 topBracketR1
                   .sort(
                     (a, b) =>
-                      (a.knockout_position || 0) - (b.knockout_position || 0)
+                      (a.knockout_position || 0) - (b.knockout_position || 0),
                   )
                   .map((match) => <BracketMatch key={match.id} match={match} />)
               ) : (
@@ -180,7 +189,7 @@ export default function Bracket() {
                 bottomBracketR1
                   .sort(
                     (a, b) =>
-                      (a.knockout_position || 0) - (b.knockout_position || 0)
+                      (a.knockout_position || 0) - (b.knockout_position || 0),
                   )
                   .map((match) => <BracketMatch key={match.id} match={match} />)
               ) : (
@@ -228,6 +237,7 @@ export default function Bracket() {
                 ) : (
                   <SemifinalPreview
                     byePlayer={qualified[0]}
+                    byeSeed={1}
                     r2WinnerLabel="Top R2 Winner"
                   />
                 )}
@@ -242,6 +252,7 @@ export default function Bracket() {
                 ) : (
                   <SemifinalPreview
                     byePlayer={qualified[1]}
+                    byeSeed={2}
                     r2WinnerLabel="Bottom R2 Winner"
                   />
                 )}
@@ -342,15 +353,17 @@ function BracketPreview({
 
 function SemifinalPreview({
   byePlayer,
+  byeSeed,
   r2WinnerLabel,
 }: {
   byePlayer: PlayerStanding;
+  byeSeed: number;
   r2WinnerLabel: string;
 }) {
   return (
     <div className="bracket-match-card pending">
       <div className="bracket-player">
-        <span className="rank-badge rank-semifinal">{byePlayer?.rank}</span>
+        <span className="rank-badge rank-semifinal">{byeSeed}</span>
         <span className={`tier-badge tier-${byePlayer?.player.tier}`}>
           {byePlayer?.player.tier}
         </span>
