@@ -47,17 +47,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     .eq("phase", "league")
     .eq("status", "completed");
 
-  // Get match stats
-  const { count: totalMatches } = await supabase
-    .from("matches")
-    .select("*", { count: "exact", head: true })
-    .eq("phase", "league");
-
   const { count: completedMatches } = await supabase
     .from("matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
+
+  const { count: remainingKnockoutMatches } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .neq("phase", "league")
+    .eq("status", "scheduled");
 
   // Get recent results (last 5 completed matches)
   const { data: recentMatches } = await supabase
@@ -96,8 +96,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     settings: settings as TournamentSettings | null,
     playerCount: (players || []).length,
-    totalMatches: totalMatches || 0,
     completedMatches: completedMatches || 0,
+    remainingKnockoutMatches: remainingKnockoutMatches || 0,
     playersWhoPlayed,
     recentMatches: (recentMatches as MatchWithPlayers[]) || [],
     standings: standings.slice(0, standingsPreviewLimit),
@@ -110,6 +110,7 @@ export default function Home() {
     settings,
     playerCount,
     completedMatches,
+    remainingKnockoutMatches,
     playersWhoPlayed,
     recentMatches,
     standings,
@@ -135,10 +136,7 @@ export default function Home() {
           <span className="stat-label">Players Active</span>
         </div>
         <div className="stat-card">
-          <span className="stat-value">
-            {Math.floor((playerCount * (playerCount - 1)) / 2) -
-              completedMatches}
-          </span>
+          <span className="stat-value">{remainingKnockoutMatches}</span>
           <span className="stat-label">Remaining Matches</span>
         </div>
         <div className="stat-card">
