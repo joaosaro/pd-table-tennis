@@ -94,6 +94,9 @@ export default function Bracket() {
   const bottomBracketR2 = round2.find((m) => m.knockout_position === 2);
   const topSemifinal = semifinals.find((m) => m.knockout_position === 1);
   const bottomSemifinal = semifinals.find((m) => m.knockout_position === 2);
+  const rankByPlayerId = new Map(
+    standings.map((standing) => [standing.player.id, standing.rank]),
+  );
 
   return (
     <main className="page">
@@ -137,7 +140,13 @@ export default function Bracket() {
                     (a, b) =>
                       (a.knockout_position || 0) - (b.knockout_position || 0),
                   )
-                  .map((match) => <BracketMatch key={match.id} match={match} />)
+                  .map((match) => (
+                    <BracketMatch
+                      key={match.id}
+                      match={match}
+                      rankByPlayerId={rankByPlayerId}
+                    />
+                  ))
               ) : (
                 <>
                   <BracketPreview seed1={4} seed2={9} qualified={qualified} />
@@ -150,7 +159,10 @@ export default function Bracket() {
             <div className="bracket-column">
               <div className="bracket-column-label">Round 2</div>
               {topBracketR2 ? (
-                <BracketMatch match={topBracketR2} />
+                <BracketMatch
+                  match={topBracketR2}
+                  rankByPlayerId={rankByPlayerId}
+                />
               ) : (
                 <div className="bracket-match-card pending">
                   <div className="bracket-player">
@@ -191,7 +203,13 @@ export default function Bracket() {
                     (a, b) =>
                       (a.knockout_position || 0) - (b.knockout_position || 0),
                   )
-                  .map((match) => <BracketMatch key={match.id} match={match} />)
+                  .map((match) => (
+                    <BracketMatch
+                      key={match.id}
+                      match={match}
+                      rankByPlayerId={rankByPlayerId}
+                    />
+                  ))
               ) : (
                 <>
                   <BracketPreview seed1={3} seed2={10} qualified={qualified} />
@@ -204,7 +222,10 @@ export default function Bracket() {
             <div className="bracket-column">
               <div className="bracket-column-label">Round 2</div>
               {bottomBracketR2 ? (
-                <BracketMatch match={bottomBracketR2} />
+                <BracketMatch
+                  match={bottomBracketR2}
+                  rankByPlayerId={rankByPlayerId}
+                />
               ) : (
                 <div className="bracket-match-card pending">
                   <div className="bracket-player">
@@ -233,7 +254,10 @@ export default function Bracket() {
                   Semifinal (Top Bracket)
                 </div>
                 {topSemifinal ? (
-                  <BracketMatch match={topSemifinal} />
+                  <BracketMatch
+                    match={topSemifinal}
+                    rankByPlayerId={rankByPlayerId}
+                  />
                 ) : (
                   <SemifinalPreview
                     byePlayer={qualified[0]}
@@ -248,7 +272,10 @@ export default function Bracket() {
                   Semifinal (Bottom Bracket)
                 </div>
                 {bottomSemifinal ? (
-                  <BracketMatch match={bottomSemifinal} />
+                  <BracketMatch
+                    match={bottomSemifinal}
+                    rankByPlayerId={rankByPlayerId}
+                  />
                 ) : (
                   <SemifinalPreview
                     byePlayer={qualified[1]}
@@ -263,7 +290,11 @@ export default function Bracket() {
             <div className="bracket-final-match">
               <div className="bracket-final-label">Final</div>
               {final ? (
-                <BracketMatch match={final} isFinal />
+                <BracketMatch
+                  match={final}
+                  isFinal
+                  rankByPlayerId={rankByPlayerId}
+                />
               ) : (
                 <div className="bracket-match-card pending final">
                   <div className="bracket-player">
@@ -287,9 +318,11 @@ export default function Bracket() {
 function BracketMatch({
   match,
   isFinal,
+  rankByPlayerId,
 }: {
   match: MatchWithPlayers;
   isFinal?: boolean;
+  rankByPlayerId: Map<string, number>;
 }) {
   const p1Won = match.winner_id === match.player1_id;
   const p2Won = match.winner_id === match.player2_id;
@@ -300,8 +333,8 @@ function BracketMatch({
       className={`bracket-match-card ${match.status} ${isFinal ? "final" : ""}`}
     >
       <div className={`bracket-player ${p1Won ? "winner" : ""}`}>
-        <span className={`tier-badge tier-${match.player1.tier}`}>
-          {match.player1.tier}
+        <span className="rank-badge rank-knockout">
+          {rankByPlayerId.get(match.player1_id) ?? "?"}
         </span>
         <span>{match.player1.name}</span>
         {match.status === "completed" && (
@@ -311,8 +344,8 @@ function BracketMatch({
         )}
       </div>
       <div className={`bracket-player ${p2Won ? "winner" : ""}`}>
-        <span className={`tier-badge tier-${match.player2.tier}`}>
-          {match.player2.tier}
+        <span className="rank-badge rank-knockout">
+          {rankByPlayerId.get(match.player2_id) ?? "?"}
         </span>
         <span>{match.player2.name}</span>
         {match.status === "completed" && (
@@ -364,9 +397,6 @@ function SemifinalPreview({
     <div className="bracket-match-card pending">
       <div className="bracket-player">
         <span className="rank-badge rank-semifinal">{byeSeed}</span>
-        <span className={`tier-badge tier-${byePlayer?.player.tier}`}>
-          {byePlayer?.player.tier}
-        </span>
         <span>{byePlayer?.player.name || "TBD"}</span>
       </div>
       <div className="bracket-player">

@@ -123,12 +123,6 @@ export default function Home() {
       <section className="hero">
         <h1>{settings?.name || "PD Table Tennis"}</h1>
         <p className="hero-subtitle">Pipedrive Table Tennis Tournament</p>
-        {settings?.league_deadline && (
-          <p className="deadline">
-            League deadline:{" "}
-            {new Date(settings.league_deadline).toLocaleDateString()}
-          </p>
-        )}
       </section>
 
       <section className="stats-grid">
@@ -139,10 +133,6 @@ export default function Home() {
         <div className="stat-card">
           <span className="stat-value">{playersWhoPlayed}</span>
           <span className="stat-label">Players Active</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-value">{completedMatches}</span>
-          <span className="stat-label">Matches Played</span>
         </div>
         <div className="stat-card">
           <span className="stat-value">
