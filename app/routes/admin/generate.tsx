@@ -9,6 +9,7 @@ import {
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
+  buildInitialKnockoutMatches,
   calculateStandings,
   deriveStandingsQualification,
 } from "~/lib/tournament.server";
@@ -30,6 +31,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     .from("matches")
     .select("*", { count: "exact", head: true })
     .neq("phase", "league");
+
+  const { count: completedKnockoutMatchCount } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .neq("phase", "league")
+    .eq("status", "completed");
 
   const { data: leagueMatches } = await supabase
     .from("matches")
@@ -59,6 +66,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     {
       playerCount: players?.length || 0,
       knockoutMatchCount: knockoutMatchCount || 0,
+      completedKnockoutMatchCount: completedKnockoutMatchCount || 0,
       leagueProgress: {
         completed: completedLeagueMatches,
         total: totalPossibleMatches,
@@ -125,42 +133,86 @@ export async function action({ request }: Route.ActionArgs) {
       };
     }
 
-    // Generate round 1 matches: 3v10, 4v9, 5v8, 6v7
-    const knockoutMatches = [
-      {
-        player1_id: qualified[2]!.player.id, // 3rd eligible
-        player2_id: qualified[9]!.player.id, // 10th eligible
-        phase: "knockout_r1",
-        status: "scheduled",
-        knockout_position: 1,
-      },
-      {
-        player1_id: qualified[3]!.player.id, // 4th eligible
-        player2_id: qualified[8]!.player.id, // 9th eligible
-        phase: "knockout_r1",
-        status: "scheduled",
-        knockout_position: 2,
-      },
-      {
-        player1_id: qualified[4]!.player.id, // 5th eligible
-        player2_id: qualified[7]!.player.id, // 8th eligible
-        phase: "knockout_r1",
-        status: "scheduled",
-        knockout_position: 3,
-      },
-      {
-        player1_id: qualified[5]!.player.id, // 6th eligible
-        player2_id: qualified[6]!.player.id, // 7th eligible
-        phase: "knockout_r1",
-        status: "scheduled",
-        knockout_position: 4,
-      },
-    ];
+    const knockoutMatches = buildInitialKnockoutMatches(qualified);
 
     const { error } = await supabase.from("matches").insert(knockoutMatches);
 
     if (error) {
       return { error: error.message };
+    }
+
+    const allHeaders = new Headers(authHeaders);
+    headers.forEach((value, key) => allHeaders.append(key, value));
+    return redirect("/admin/matches", { headers: allHeaders });
+  }
+
+  if (intent === "repair_knockout") {
+    const { data: existingKnockoutMatches } = await supabase
+      .from("matches")
+      .select("id, status")
+      .neq("phase", "league");
+
+    const knockoutMatches = existingKnockoutMatches || [];
+
+    if (knockoutMatches.length === 0) {
+      return { error: "No knockout matches exist to repair." };
+    }
+
+    if (knockoutMatches.some((match) => match.status === "completed")) {
+      return {
+        error:
+          "Cannot repair the knockout bracket after knockout matches have been completed.",
+      };
+    }
+
+    const { data: players } = await supabase.from("players").select("*");
+
+    const { data: leagueMatches } = await supabase
+      .from("matches")
+      .select(
+        `
+        *,
+        player1:players!matches_player1_id_fkey(*),
+        player2:players!matches_player2_id_fkey(*)
+      `,
+      )
+      .eq("phase", "league")
+      .eq("status", "completed");
+
+    const standings = calculateStandings(
+      (players as Player[]) || [],
+      (leagueMatches as MatchWithPlayers[]) || [],
+    );
+    const qualification = deriveStandingsQualification(standings);
+    const qualified = qualification.qualifiedPlayerIds
+      .map((playerId) =>
+        standings.find((standing) => standing.player.id === playerId),
+      )
+      .filter((standing): standing is PlayerStanding => Boolean(standing));
+
+    if (qualified.length < 10) {
+      return {
+        error:
+          "Need at least 10 eligible players with completed matches to repair knockout.",
+      };
+    }
+
+    const { error: deleteError } = await supabase
+      .from("matches")
+      .delete()
+      .neq("phase", "league");
+
+    if (deleteError) {
+      return { error: deleteError.message };
+    }
+
+    const repairedMatches = buildInitialKnockoutMatches(qualified);
+    const { error: insertError } = await supabase
+      .from("matches")
+      .insert(repairedMatches);
+
+    if (insertError) {
+      return { error: insertError.message };
     }
 
     const allHeaders = new Headers(authHeaders);
@@ -175,6 +227,7 @@ export default function AdminGenerate() {
   const {
     playerCount,
     knockoutMatchCount,
+    completedKnockoutMatchCount,
     leagueProgress,
     canGenerateKnockout,
   } = useLoaderData<typeof loader>();
@@ -215,7 +268,7 @@ export default function AdminGenerate() {
           <p>
             Generate knockout round 1 matches based on league standings.
             <br />
-            Matchups: 3rd vs 10th, 4th vs 9th, 5th vs 8th, 6th vs 7th
+            Matchups: 4th vs 9th, 5th vs 8th, 3rd vs 10th, 6th vs 7th
           </p>
           <Form method="post">
             <button
@@ -229,9 +282,26 @@ export default function AdminGenerate() {
             </button>
           </Form>
           {knockoutMatchCount > 0 && (
-            <p className="help-text">
-              Knockout matches already exist. Go to Matches page to manage them.
-            </p>
+            <>
+              <p className="help-text">Knockout matches already exist.</p>
+              <Form method="post">
+                <button
+                  type="submit"
+                  name="intent"
+                  value="repair_knockout"
+                  className="btn btn-secondary"
+                  disabled={isSubmitting || completedKnockoutMatchCount > 0}
+                >
+                  {isSubmitting ? "Updating..." : "Repair Knockout Bracket"}
+                </button>
+              </Form>
+              {completedKnockoutMatchCount > 0 && (
+                <p className="help-text">
+                  Repair is disabled because knockout matches have already been
+                  completed.
+                </p>
+              )}
+            </>
           )}
           {knockoutMatchCount === 0 && !canGenerateKnockout && (
             <p className="help-text">

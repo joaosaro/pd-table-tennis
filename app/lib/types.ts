@@ -141,7 +141,7 @@ export interface KnockoutMatch {
 }
 
 export interface KnockoutBracket {
-  round1: KnockoutMatch[]; // 3v10, 4v9, 5v8, 6v7
+  round1: KnockoutMatch[]; // 4v9, 5v8, 3v10, 6v7
   round2: KnockoutMatch[]; // Winners reseeded
   semifinals: KnockoutMatch[]; // 1st + 2nd vs knockout winners
   final: KnockoutMatch | null;

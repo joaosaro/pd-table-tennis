@@ -271,7 +271,8 @@ export function generateLeagueMatchPairs(
 /**
  * Generate knockout bracket from standings.
  * Top 2 get byes to semifinals.
- * 3rd-10th play first round: 3v10, 4v9, 5v8, 6v7.
+ * 3rd-10th play first round with 3rd and 4th on opposite halves:
+ * 4v9, 5v8, 3v10, 6v7.
  */
 export function generateKnockoutMatchups(standings: PlayerStanding[]): {
   round1: [PlayerStanding, PlayerStanding][];
@@ -285,15 +286,33 @@ export function generateKnockoutMatchups(standings: PlayerStanding[]): {
     .filter((standing): standing is PlayerStanding => Boolean(standing));
   const byePlayers = qualified.slice(0, 2);
 
-  // Round 1: 3v10, 4v9, 5v8, 6v7
+  // Round 1: 4v9, 5v8, 3v10, 6v7
   const round1: [PlayerStanding, PlayerStanding][] = [
-    [qualified[2], qualified[9]], // 3rd vs 10th
     [qualified[3], qualified[8]], // 4th vs 9th
     [qualified[4], qualified[7]], // 5th vs 8th
+    [qualified[2], qualified[9]], // 3rd vs 10th
     [qualified[5], qualified[6]], // 6th vs 7th
   ];
 
   return { round1, byePlayers };
+}
+
+export function buildInitialKnockoutMatches(standings: PlayerStanding[]): {
+  player1_id: string;
+  player2_id: string;
+  phase: "knockout_r1";
+  status: "scheduled";
+  knockout_position: number;
+}[] {
+  const { round1 } = generateKnockoutMatchups(standings);
+
+  return round1.map(([player1, player2], index) => ({
+    player1_id: player1.player.id,
+    player2_id: player2.player.id,
+    phase: "knockout_r1",
+    status: "scheduled",
+    knockout_position: index + 1,
+  }));
 }
 
 /**
@@ -467,8 +486,8 @@ function generateNextRoundMatchups(
   | null {
   if (phase === "knockout_r2") {
     // Round 2: Fixed paths based on bracket position
-    // Top bracket: pos 1 (3v10) winner vs pos 2 (4v9) winner
-    // Bottom bracket: pos 3 (5v8) winner vs pos 4 (6v7) winner
+    // Top bracket: pos 1 (4v9) winner vs pos 2 (5v8) winner
+    // Bottom bracket: pos 3 (3v10) winner vs pos 4 (6v7) winner
     const r1Matches = allKnockoutMatches.filter(
       (m) => m.phase === "knockout_r1",
     );
@@ -504,8 +523,13 @@ function generateNextRoundMatchups(
   if (phase === "semifinal") {
     // Semifinals: Fixed paths
     // Semi 1: #1 seed vs top bracket R2 winner (pos 1)
-    // Semi 2: #2 seed vs bottom bracket R2 winner (pos 2)
-    const byePlayers = standings.slice(0, 2);
+    // Semi 2: #2 seed vs bottom bracket R2 winner (pos 2, includes 3rd seed path)
+    const qualification = deriveStandingsQualification(standings);
+    const byePlayers = qualification.semifinalPlayerIds
+      .map((playerId) =>
+        standings.find((standing) => standing.player.id === playerId),
+      )
+      .filter((standing): standing is PlayerStanding => Boolean(standing));
     const r2Matches = allKnockoutMatches.filter(
       (m) => m.phase === "knockout_r2",
     );

@@ -140,8 +140,8 @@ export default function Bracket() {
                   .map((match) => <BracketMatch key={match.id} match={match} />)
               ) : (
                 <>
-                  <BracketPreview seed1={3} seed2={10} qualified={qualified} />
                   <BracketPreview seed1={4} seed2={9} qualified={qualified} />
+                  <BracketPreview seed1={5} seed2={8} qualified={qualified} />
                 </>
               )}
             </div>
@@ -155,11 +155,11 @@ export default function Bracket() {
                 <div className="bracket-match-card pending">
                   <div className="bracket-player">
                     <span className="rank-badge rank-knockout">?</span>
-                    <span>Winner 3v10</span>
+                    <span>Winner 4v9</span>
                   </div>
                   <div className="bracket-player">
                     <span className="rank-badge rank-knockout">?</span>
-                    <span>Winner 4v9</span>
+                    <span>Winner 5v8</span>
                   </div>
                 </div>
               )}
@@ -194,7 +194,7 @@ export default function Bracket() {
                   .map((match) => <BracketMatch key={match.id} match={match} />)
               ) : (
                 <>
-                  <BracketPreview seed1={5} seed2={8} qualified={qualified} />
+                  <BracketPreview seed1={3} seed2={10} qualified={qualified} />
                   <BracketPreview seed1={6} seed2={7} qualified={qualified} />
                 </>
               )}
@@ -209,7 +209,7 @@ export default function Bracket() {
                 <div className="bracket-match-card pending">
                   <div className="bracket-player">
                     <span className="rank-badge rank-knockout">?</span>
-                    <span>Winner 5v8</span>
+                    <span>Winner 3v10</span>
                   </div>
                   <div className="bracket-player">
                     <span className="rank-badge rank-knockout">?</span>
