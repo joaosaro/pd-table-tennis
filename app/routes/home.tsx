@@ -139,7 +139,11 @@ export default function Home() {
             {Math.floor((playerCount * (playerCount - 1)) / 2) -
               completedMatches}
           </span>
-          <span className="stat-label">Available to Play</span>
+          <span className="stat-label">Remaining Matches</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-value">{completedMatches}</span>
+          <span className="stat-label">Matches Played</span>
         </div>
       </section>
 
