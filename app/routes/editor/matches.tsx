@@ -1,6 +1,7 @@
 import { Link, data, useLoaderData, useSearchParams } from "react-router";
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { getLeagueProgress } from "~/lib/tournament.server";
 import type { MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/matches";
 
@@ -21,6 +22,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     .from("players")
     .select("*")
     .order("name", { ascending: true });
+
+  const { count: completedLeagueMatches } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .eq("phase", "league")
+    .eq("status", "completed");
 
   let query = supabase
     .from("matches")
@@ -44,26 +51,17 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { data: matches } = await query;
 
-  // Calculate league progress
   const allPlayers = (players as Player[]) || [];
-  const leagueMatches =
-    (matches as MatchWithPlayers[])?.filter(
-      (m) => m.phase === "league" && m.status === "completed"
-    ) || [];
-
-  const totalPossibleMatches =
-    (allPlayers.length * (allPlayers.length - 1)) / 2;
-  const completedLeagueMatches = leagueMatches.length;
+  const leagueProgress = getLeagueProgress(
+    allPlayers.length,
+    completedLeagueMatches || 0
+  );
 
   return data(
     {
       matches: (matches as MatchWithPlayers[]) || [],
       players: players || [],
-      leagueProgress: {
-        completed: completedLeagueMatches,
-        total: totalPossibleMatches,
-        remaining: totalPossibleMatches - completedLeagueMatches,
-      },
+      leagueProgress,
     },
     { headers }
   );
@@ -76,7 +74,11 @@ export default function EditorMatches() {
   const currentPhase = searchParams.get("phase") || "all";
   const currentPlayer = searchParams.get("player") || "all";
 
-  const scheduledMatches = matches.filter((m) => m.status === "scheduled");
+  const scheduledMatches = matches.filter(
+    (m) =>
+      m.status === "scheduled" &&
+      (!leagueProgress.isFinished || m.phase !== "league")
+  );
   const completedMatches = matches.filter((m) => m.status === "completed");
 
   function updateFilter(key: string, value: string) {
@@ -113,6 +115,19 @@ export default function EditorMatches() {
         </section>
       )}
 
+      {leagueProgress.isFinished && (
+        <section className="admin-section league-record-section">
+          <div className="league-progress-header">
+            <div>
+              <h2>League Complete</h2>
+              <p className="league-progress-stats">
+                Only open knockout matches can be submitted now.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       <div className="results-filters">
         <div className="filter-group">
           <label>Phase:</label>
@@ -145,6 +160,48 @@ export default function EditorMatches() {
           </select>
         </div>
       </div>
+
+      <section className="admin-section">
+        <h2>Open Matches ({scheduledMatches.length})</h2>
+        {scheduledMatches.length === 0 ? (
+          <p className="empty">No open matches.</p>
+        ) : (
+          <div className="results-list">
+            {scheduledMatches.map((match) => (
+              <div key={match.id} className="results-card scheduled">
+                <div className="results-card-main">
+                  <div className="results-player">
+                    <span className={`tier-badge tier-${match.player1.tier}`}>
+                      {match.player1.tier}
+                    </span>
+                    <span>{match.player1.name}</span>
+                  </div>
+                  <div className="results-vs">
+                    <span>vs</span>
+                  </div>
+                  <div className="results-player">
+                    <span>{match.player2.name}</span>
+                    <span className={`tier-badge tier-${match.player2.tier}`}>
+                      {match.player2.tier}
+                    </span>
+                  </div>
+                </div>
+                <div className="results-card-actions">
+                  <span className={`phase-badge ${match.phase}`}>
+                    {formatPhase(match.phase)}
+                  </span>
+                  <Link
+                    to={`/editor/record/${match.id}`}
+                    className="btn btn-primary"
+                  >
+                    Record Result
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="admin-section">
         <h2>Completed Matches ({completedMatches.length})</h2>
@@ -187,12 +244,14 @@ export default function EditorMatches() {
                   <span className={`phase-badge ${match.phase}`}>
                     {formatPhase(match.phase)}
                   </span>
-                  <Link
-                    to={`/editor/record/${match.id}`}
-                    className="btn btn-secondary"
-                  >
-                    Edit Result
-                  </Link>
+                  {!leagueProgress.isFinished && (
+                    <Link
+                      to={`/editor/record/${match.id}`}
+                      className="btn btn-secondary"
+                    >
+                      Edit Result
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}

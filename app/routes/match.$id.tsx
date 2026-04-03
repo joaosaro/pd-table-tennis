@@ -1,6 +1,7 @@
 import { Link, useLoaderData } from "react-router";
 import { getUser } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { getLeagueProgress } from "~/lib/tournament.server";
 import type { MatchWithPlayers } from "~/lib/types";
 import { TIER_POINTS } from "~/lib/types";
 import type { Route } from "./+types/match.$id";
@@ -37,12 +38,27 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  const { data: players } = await supabase.from("players").select("id");
+  const { count: completedLeagueMatches } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .eq("phase", "league")
+    .eq("status", "completed");
 
-  return { match: match as MatchWithPlayers, canEdit };
+  const leagueProgress = getLeagueProgress(
+    players?.length || 0,
+    completedLeagueMatches || 0
+  );
+  const canSubmitResult =
+    canEdit &&
+    (!leagueProgress.isFinished ||
+      (match.phase !== "league" && match.status === "scheduled"));
+
+  return { match: match as MatchWithPlayers, canSubmitResult };
 }
 
 export default function MatchDetails() {
-  const { match, canEdit } = useLoaderData<typeof loader>();
+  const { match, canSubmitResult } = useLoaderData<typeof loader>();
 
   const sets = [
     { num: 1, p1: match.set1_p1, p2: match.set1_p2 },
@@ -70,7 +86,7 @@ export default function MatchDetails() {
           {match.status === "scheduled" && (
             <span className="status-badge scheduled">Scheduled</span>
           )}
-          {canEdit && (
+          {canSubmitResult && (
             <Link
               to={`/editor/record/${match.id}`}
               className="btn btn-primary"
