@@ -10,6 +10,7 @@ import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
+  getLeagueProgress,
   getKnockoutRoundUpdates,
 } from "~/lib/tournament.server";
 import type { Match, MatchWithPlayers, Player } from "~/lib/types";
@@ -45,6 +46,25 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   if (!match) {
     throw new Response("Match not found", { status: 404 });
+  }
+
+  const { data: players } = await supabase.from("players").select("id");
+  const { count: completedLeagueMatches } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .eq("phase", "league")
+    .eq("status", "completed");
+
+  const leagueProgress = getLeagueProgress(
+    players?.length || 0,
+    completedLeagueMatches || 0
+  );
+
+  if (
+    leagueProgress.isFinished &&
+    (match.phase === "league" || match.status !== "scheduled")
+  ) {
+    return redirect("/editor/matches", { headers });
   }
 
   return data({ match: match as MatchWithPlayers }, { headers });
@@ -93,12 +113,33 @@ export async function action({ request, params }: Route.ActionArgs) {
   // Get the match to determine winner and phase
   const { data: match } = await supabase
     .from("matches")
-    .select("player1_id, player2_id, phase")
+    .select("player1_id, player2_id, phase, status")
     .eq("id", params.matchId)
     .single();
 
   if (!match) {
     return { error: "Match not found" };
+  }
+
+  const { data: players } = await supabase.from("players").select("id");
+  const { count: completedLeagueMatches } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .eq("phase", "league")
+    .eq("status", "completed");
+
+  const leagueProgress = getLeagueProgress(
+    players?.length || 0,
+    completedLeagueMatches || 0
+  );
+
+  if (
+    leagueProgress.isFinished &&
+    (match.phase === "league" || match.status !== "scheduled")
+  ) {
+    return {
+      error: "Only open knockout matches can be submitted after the league is complete.",
+    };
   }
 
   const winnerId = p1Sets > p2Sets ? match.player1_id : match.player2_id;

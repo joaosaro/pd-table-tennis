@@ -1,7 +1,7 @@
 import {
   data,
   Form,
-  redirect,
+  redirect as routerRedirect,
   useActionData,
   useLoaderData,
   useNavigation,
@@ -9,6 +9,7 @@ import {
 import { useState } from "react";
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { getLeagueProgress } from "~/lib/tournament.server";
 import type { Player } from "~/lib/types";
 import type { Route } from "./+types/record-league";
 
@@ -27,12 +28,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*")
     .order("name");
 
-  // Get all completed league matches to know which pairs have already played
   const { data: completedMatches } = await supabase
     .from("matches")
     .select("player1_id, player2_id")
     .eq("phase", "league")
     .eq("status", "completed");
+
+  const leagueProgress = getLeagueProgress(
+    (players as Player[])?.length || 0,
+    completedMatches?.length || 0
+  );
+
+  if (leagueProgress.isFinished) {
+    return routerRedirect("/editor/matches", { headers });
+  }
 
   // Build a set of played pairs (sorted IDs to make lookup consistent)
   const playedPairs = new Set<string>();
@@ -68,6 +77,24 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (player1Id === player2Id) {
     return { error: "Please select two different players" };
+  }
+
+  const { data: players } = await supabase.from("players").select("id");
+  const { count: completedLeagueMatches } = await supabase
+    .from("matches")
+    .select("*", { count: "exact", head: true })
+    .eq("phase", "league")
+    .eq("status", "completed");
+
+  const leagueProgress = getLeagueProgress(
+    players?.length || 0,
+    completedLeagueMatches || 0
+  );
+
+  if (leagueProgress.isFinished) {
+    return {
+      error: "The league stage is complete. Only open knockout matches can be submitted now.",
+    };
   }
 
   // Check if this match already exists
@@ -140,7 +167,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const allHeaders = new Headers(authHeaders);
   headers.forEach((value, key) => allHeaders.append(key, value));
-  return redirect("/results", { headers: allHeaders });
+  return routerRedirect("/results", { headers: allHeaders });
 }
 
 export default function RecordLeagueMatch() {

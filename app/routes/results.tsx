@@ -95,7 +95,7 @@ export default function Results() {
 
       {canEdit && (
         <div className="results-actions">
-          <Link to="/editor/record-league" className="btn btn-primary">
+          <Link to="/editor/matches" className="btn btn-primary">
             Submit Results
           </Link>
         </div>

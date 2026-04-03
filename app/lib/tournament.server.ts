@@ -168,6 +168,21 @@ export function deriveStandingsQualification(
   };
 }
 
+export function getLeagueProgress(
+  playerCount: number,
+  completedLeagueMatches: number,
+) {
+  const total = (playerCount * (playerCount - 1)) / 2;
+  const remaining = Math.max(0, total - completedLeagueMatches);
+
+  return {
+    completed: completedLeagueMatches,
+    total,
+    remaining,
+    isFinished: remaining === 0,
+  };
+}
+
 /**
  * Get total head-to-head wins within a tied group (mini-table).
  */
