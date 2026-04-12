@@ -97,6 +97,17 @@ export default function Bracket() {
   const rankByPlayerId = new Map(
     standings.map((standing) => [standing.player.id, standing.rank]),
   );
+  const matchByPosition = new Map(
+    round1.map((match) => [match.knockout_position, match] as const),
+  );
+  const topR2KnownPlayer1 = getMatchWinner(matchByPosition.get(1));
+  const topR2KnownPlayer2 = getMatchWinner(matchByPosition.get(2));
+  const bottomR2KnownPlayer1 = getMatchWinner(matchByPosition.get(3));
+  const bottomR2KnownPlayer2 = getMatchWinner(matchByPosition.get(4));
+  const topSemifinalKnownWinner = getMatchWinner(topBracketR2);
+  const bottomSemifinalKnownWinner = getMatchWinner(bottomBracketR2);
+  const topFinalist = getMatchWinner(topSemifinal);
+  const bottomFinalist = getMatchWinner(bottomSemifinal);
 
   return (
     <main className="page">
@@ -164,16 +175,13 @@ export default function Bracket() {
                   rankByPlayerId={rankByPlayerId}
                 />
               ) : (
-                <div className="bracket-match-card pending">
-                  <div className="bracket-player">
-                    <span className="rank-badge rank-knockout">?</span>
-                    <span>Winner 4v9</span>
-                  </div>
-                  <div className="bracket-player">
-                    <span className="rank-badge rank-knockout">?</span>
-                    <span>Winner 5v8</span>
-                  </div>
-                </div>
+                <PendingMatchPreview
+                  player1={topR2KnownPlayer1}
+                  player1Label="Winner 4v9"
+                  player2={topR2KnownPlayer2}
+                  player2Label="Winner 5v8"
+                  rankByPlayerId={rankByPlayerId}
+                />
               )}
             </div>
           </div>
@@ -227,16 +235,13 @@ export default function Bracket() {
                   rankByPlayerId={rankByPlayerId}
                 />
               ) : (
-                <div className="bracket-match-card pending">
-                  <div className="bracket-player">
-                    <span className="rank-badge rank-knockout">?</span>
-                    <span>Winner 3v10</span>
-                  </div>
-                  <div className="bracket-player">
-                    <span className="rank-badge rank-knockout">?</span>
-                    <span>Winner 6v7</span>
-                  </div>
-                </div>
+                <PendingMatchPreview
+                  player1={bottomR2KnownPlayer1}
+                  player1Label="Winner 3v10"
+                  player2={bottomR2KnownPlayer2}
+                  player2Label="Winner 6v7"
+                  rankByPlayerId={rankByPlayerId}
+                />
               )}
             </div>
           </div>
@@ -262,7 +267,9 @@ export default function Bracket() {
                   <SemifinalPreview
                     byePlayer={qualified[0]}
                     byeSeed={1}
+                    player2={topSemifinalKnownWinner}
                     r2WinnerLabel="Top R2 Winner"
+                    rankByPlayerId={rankByPlayerId}
                   />
                 )}
               </div>
@@ -280,7 +287,9 @@ export default function Bracket() {
                   <SemifinalPreview
                     byePlayer={qualified[1]}
                     byeSeed={2}
+                    player2={bottomSemifinalKnownWinner}
                     r2WinnerLabel="Bottom R2 Winner"
+                    rankByPlayerId={rankByPlayerId}
                   />
                 )}
               </div>
@@ -296,16 +305,14 @@ export default function Bracket() {
                   rankByPlayerId={rankByPlayerId}
                 />
               ) : (
-                <div className="bracket-match-card pending final">
-                  <div className="bracket-player">
-                    <span className="rank-badge rank-knockout">?</span>
-                    <span>Top Semi Winner</span>
-                  </div>
-                  <div className="bracket-player">
-                    <span className="rank-badge rank-knockout">?</span>
-                    <span>Bottom Semi Winner</span>
-                  </div>
-                </div>
+                <PendingMatchPreview
+                  player1={topFinalist}
+                  player1Label="Top Semi Winner"
+                  player2={bottomFinalist}
+                  player2Label="Bottom Semi Winner"
+                  rankByPlayerId={rankByPlayerId}
+                  isFinal
+                />
               )}
             </div>
           </div>
@@ -384,14 +391,68 @@ function BracketPreview({
   );
 }
 
+function PendingMatchPreview({
+  player1,
+  player1Label,
+  player2,
+  player2Label,
+  rankByPlayerId,
+  isFinal,
+}: {
+  player1?: Player | null;
+  player1Label: string;
+  player2?: Player | null;
+  player2Label: string;
+  rankByPlayerId: Map<string, number>;
+  isFinal?: boolean;
+}) {
+  return (
+    <div className={`bracket-match-card pending ${isFinal ? "final" : ""}`}>
+      <PendingBracketPlayer
+        player={player1}
+        fallbackLabel={player1Label}
+        rankByPlayerId={rankByPlayerId}
+      />
+      <PendingBracketPlayer
+        player={player2}
+        fallbackLabel={player2Label}
+        rankByPlayerId={rankByPlayerId}
+      />
+    </div>
+  );
+}
+
+function PendingBracketPlayer({
+  player,
+  fallbackLabel,
+  rankByPlayerId,
+}: {
+  player?: Player | null;
+  fallbackLabel: string;
+  rankByPlayerId: Map<string, number>;
+}) {
+  return (
+    <div className="bracket-player">
+      <span className="rank-badge rank-knockout">
+        {player ? rankByPlayerId.get(player.id) ?? "?" : "?"}
+      </span>
+      <span>{player?.name || fallbackLabel}</span>
+    </div>
+  );
+}
+
 function SemifinalPreview({
   byePlayer,
   byeSeed,
+  player2,
   r2WinnerLabel,
+  rankByPlayerId,
 }: {
   byePlayer: PlayerStanding;
   byeSeed: number;
+  player2?: Player | null;
   r2WinnerLabel: string;
+  rankByPlayerId: Map<string, number>;
 }) {
   return (
     <div className="bracket-match-card pending">
@@ -399,12 +460,20 @@ function SemifinalPreview({
         <span className="rank-badge rank-semifinal">{byeSeed}</span>
         <span>{byePlayer?.player.name || "TBD"}</span>
       </div>
-      <div className="bracket-player">
-        <span className="rank-badge rank-knockout">?</span>
-        <span>{r2WinnerLabel}</span>
-      </div>
+      <PendingBracketPlayer
+        player={player2}
+        fallbackLabel={r2WinnerLabel}
+        rankByPlayerId={rankByPlayerId}
+      />
     </div>
   );
+}
+
+function getMatchWinner(match?: MatchWithPlayers) {
+  if (!match?.winner_id) return null;
+  if (match.winner_id === match.player1_id) return match.player1;
+  if (match.winner_id === match.player2_id) return match.player2;
+  return null;
 }
 
 function countSetsWon(match: MatchWithPlayers, playerId: string): number {
