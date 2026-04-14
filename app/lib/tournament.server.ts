@@ -411,35 +411,49 @@ export function getKnockoutRoundUpdates(
       (m) => m.status === "scheduled",
     );
 
-    // Helper to check if a matchup already exists in nextPhaseMatches (scheduled OR completed)
-    const matchupExists = (matchup: {
-      player1_id: string;
-      player2_id: string;
-    }) =>
-      nextPhaseMatches.some(
-        (existing) =>
-          (existing.player1_id === matchup.player1_id &&
-            existing.player2_id === matchup.player2_id) ||
-          (existing.player1_id === matchup.player2_id &&
-            existing.player2_id === matchup.player1_id),
-      );
-
-    // Find scheduled matches that don't match any expected matchup (stale matches)
-    const staleScheduledMatches = scheduledMatches.filter(
-      (existing) =>
-        !expectedMatchups.some(
-          (expected) =>
-            (existing.player1_id === expected.player1_id &&
-              existing.player2_id === expected.player2_id) ||
-            (existing.player1_id === expected.player2_id &&
-              existing.player2_id === expected.player1_id),
-        ),
+    const hasKnockoutPositions = expectedMatchups.some(
+      (matchup) => matchup.knockout_position !== undefined,
     );
+
+    const isSameMatchup = (
+      existing: { player1_id: string; player2_id: string },
+      expected: { player1_id: string; player2_id: string },
+    ) =>
+      (existing.player1_id === expected.player1_id &&
+        existing.player2_id === expected.player2_id) ||
+      (existing.player1_id === expected.player2_id &&
+        existing.player2_id === expected.player1_id);
+
+    // For bracketed rounds, reconcile by knockout_position so an already-known
+    // branch isn't deleted just because another branch isn't ready yet.
+    const staleScheduledMatches = hasKnockoutPositions
+      ? scheduledMatches.filter((existing) => {
+          if (existing.knockout_position === null) return false;
+          const expected = expectedMatchups.find(
+            (m) => m.knockout_position === existing.knockout_position,
+          );
+          if (!expected) return false; // Slot not ready yet, keep existing match.
+          return !isSameMatchup(existing, expected);
+        })
+      : scheduledMatches.filter(
+          (existing) =>
+            !expectedMatchups.some((expected) => isSameMatchup(existing, expected)),
+        );
 
     // Find expected matchups that don't exist yet (need to be created)
-    const missingMatchups = expectedMatchups.filter(
-      (expected) => !matchupExists(expected),
-    );
+    const missingMatchups = hasKnockoutPositions
+      ? expectedMatchups.filter((expected) => {
+          if (expected.knockout_position === undefined) return false;
+          return !nextPhaseMatches.some(
+            (existing) =>
+              existing.knockout_position === expected.knockout_position &&
+              isSameMatchup(existing, expected),
+          );
+        })
+      : expectedMatchups.filter(
+          (expected) =>
+            !nextPhaseMatches.some((existing) => isSameMatchup(existing, expected)),
+        );
 
     // Delete stale scheduled matches (wrong players due to edited results)
     if (staleScheduledMatches.length > 0) {
