@@ -98,23 +98,6 @@ export default function EditorMatches() {
         <p>Select a match to submit the result</p>
       </div>
 
-      {leagueProgress.remaining > 0 && (
-        <section className="admin-section league-record-section">
-          <div className="league-progress-header">
-            <div>
-              <h2>League Progress</h2>
-              <p className="league-progress-stats">
-                {leagueProgress.completed} / {leagueProgress.total} matches
-                completed ({leagueProgress.remaining} remaining)
-              </p>
-            </div>
-            <Link to="/editor/record-league" className="btn btn-primary">
-              Submit League Result
-            </Link>
-          </div>
-        </section>
-      )}
-
       {leagueProgress.isFinished && (
         <section className="admin-section league-record-section">
           <div className="league-progress-header">
