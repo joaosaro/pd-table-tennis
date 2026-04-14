@@ -392,38 +392,14 @@ export function getKnockoutRoundUpdates(
   } = { inserts: [], deletes: [] };
 
   for (const progression of KNOCKOUT_PROGRESSION) {
-    const phaseMatches = allKnockoutMatches.filter(
-      (m) => m.phase === progression.currentPhase,
-    );
-
-    // Check if we have all expected matches and all are completed
-    if (phaseMatches.length !== progression.expectedMatches) {
-      continue;
-    }
-
-    const allCompleted = phaseMatches.every((m) => m.status === "completed");
-    if (!allCompleted) {
-      continue;
-    }
-
-    // Get winners from completed phase
-    const winners = phaseMatches
-      .map((m) => m.winner_id!)
-      .filter((id) => id !== null);
-
-    if (winners.length !== progression.expectedMatches) {
-      continue;
-    }
-
-    // Generate the expected next round matchups
-    const expectedMatchups = generateNextRoundMatchups(
+    // Generate matchups that are ready based on currently completed paths.
+    // This supports progressive bracket creation (e.g. create top R2 as soon as
+    // both top R1 matches are complete, without waiting for bottom R1).
+    const expectedMatchups = generateReadyNextRoundMatchups(
       progression.nextPhase,
-      winners,
       standings,
       allKnockoutMatches,
     );
-
-    if (!expectedMatchups) continue;
 
     // Check if next phase already exists
     const nextPhaseMatches = allKnockoutMatches.filter(
@@ -580,6 +556,119 @@ function generateNextRoundMatchups(
   }
 
   return null;
+}
+
+/**
+ * Generate next round matchups that are currently ready to be created.
+ * Unlike generateNextRoundMatchups, this can return partial matchups
+ * for bracketed phases as soon as each side is decided.
+ */
+function generateReadyNextRoundMatchups(
+  phase: string,
+  standings: PlayerStanding[],
+  allKnockoutMatches: Match[],
+): { player1_id: string; player2_id: string; knockout_position?: number }[] {
+  if (phase === "knockout_r2") {
+    const r1Matches = allKnockoutMatches.filter(
+      (m) => m.phase === "knockout_r1",
+    );
+
+    const pos1Winner = r1Matches.find((m) => m.knockout_position === 1)
+      ?.winner_id;
+    const pos2Winner = r1Matches.find((m) => m.knockout_position === 2)
+      ?.winner_id;
+    const pos3Winner = r1Matches.find((m) => m.knockout_position === 3)
+      ?.winner_id;
+    const pos4Winner = r1Matches.find((m) => m.knockout_position === 4)
+      ?.winner_id;
+
+    const matchups: {
+      player1_id: string;
+      player2_id: string;
+      knockout_position?: number;
+    }[] = [];
+
+    if (pos1Winner && pos2Winner) {
+      matchups.push({
+        player1_id: pos1Winner,
+        player2_id: pos2Winner,
+        knockout_position: 1,
+      });
+    }
+
+    if (pos3Winner && pos4Winner) {
+      matchups.push({
+        player1_id: pos3Winner,
+        player2_id: pos4Winner,
+        knockout_position: 2,
+      });
+    }
+
+    return matchups;
+  }
+
+  if (phase === "semifinal") {
+    const qualification = deriveStandingsQualification(standings);
+    const byePlayers = qualification.semifinalPlayerIds
+      .map((playerId) =>
+        standings.find((standing) => standing.player.id === playerId),
+      )
+      .filter((standing): standing is PlayerStanding => Boolean(standing));
+
+    if (byePlayers.length !== 2) return [];
+
+    const r2Matches = allKnockoutMatches.filter(
+      (m) => m.phase === "knockout_r2",
+    );
+    const topBracketWinner = r2Matches.find((m) => m.knockout_position === 1)
+      ?.winner_id;
+    const bottomBracketWinner = r2Matches.find((m) => m.knockout_position === 2)
+      ?.winner_id;
+
+    const matchups: {
+      player1_id: string;
+      player2_id: string;
+      knockout_position?: number;
+    }[] = [];
+
+    if (topBracketWinner) {
+      matchups.push({
+        player1_id: byePlayers[0].player.id,
+        player2_id: topBracketWinner,
+        knockout_position: 1,
+      });
+    }
+
+    if (bottomBracketWinner) {
+      matchups.push({
+        player1_id: byePlayers[1].player.id,
+        player2_id: bottomBracketWinner,
+        knockout_position: 2,
+      });
+    }
+
+    return matchups;
+  }
+
+  if (phase === "final") {
+    const semifinalMatches = allKnockoutMatches.filter(
+      (m) => m.phase === "semifinal",
+    );
+    const semifinalWinners = semifinalMatches
+      .map((m) => m.winner_id)
+      .filter((winnerId): winnerId is string => Boolean(winnerId));
+
+    if (semifinalWinners.length !== 2) return [];
+
+    return [
+      {
+        player1_id: semifinalWinners[0],
+        player2_id: semifinalWinners[1],
+      },
+    ];
+  }
+
+  return [];
 }
 
 /**
