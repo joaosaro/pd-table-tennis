@@ -587,14 +587,10 @@ function generateReadyNextRoundMatchups(
       (m) => m.phase === "knockout_r1",
     );
 
-    const pos1Winner = r1Matches.find((m) => m.knockout_position === 1)
-      ?.winner_id;
-    const pos2Winner = r1Matches.find((m) => m.knockout_position === 2)
-      ?.winner_id;
-    const pos3Winner = r1Matches.find((m) => m.knockout_position === 3)
-      ?.winner_id;
-    const pos4Winner = r1Matches.find((m) => m.knockout_position === 4)
-      ?.winner_id;
+    const pos1Winner = getWinnerForPosition(r1Matches, 1);
+    const pos2Winner = getWinnerForPosition(r1Matches, 2);
+    const pos3Winner = getWinnerForPosition(r1Matches, 3);
+    const pos4Winner = getWinnerForPosition(r1Matches, 4);
 
     const matchups: {
       player1_id: string;
@@ -634,10 +630,8 @@ function generateReadyNextRoundMatchups(
     const r2Matches = allKnockoutMatches.filter(
       (m) => m.phase === "knockout_r2",
     );
-    const topBracketWinner = r2Matches.find((m) => m.knockout_position === 1)
-      ?.winner_id;
-    const bottomBracketWinner = r2Matches.find((m) => m.knockout_position === 2)
-      ?.winner_id;
+    const topBracketWinner = getWinnerForPosition(r2Matches, 1);
+    const bottomBracketWinner = getWinnerForPosition(r2Matches, 2);
 
     const matchups: {
       player1_id: string;
@@ -683,6 +677,23 @@ function generateReadyNextRoundMatchups(
   }
 
   return [];
+}
+
+function getWinnerForPosition(
+  matches: Match[],
+  knockoutPosition: number,
+): string | null {
+  const forPosition = matches.filter(
+    (m) => m.knockout_position === knockoutPosition,
+  );
+  if (forPosition.length === 0) return null;
+
+  const completedWinner = forPosition.find(
+    (m) => m.status === "completed" && Boolean(m.winner_id),
+  )?.winner_id;
+  if (completedWinner) return completedWinner;
+
+  return forPosition.find((m) => Boolean(m.winner_id))?.winner_id || null;
 }
 
 /**

@@ -1,8 +1,12 @@
 import { Link, data, useLoaderData, useSearchParams } from "react-router";
 import { requireRole } from "~/lib/auth.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { getLeagueProgress } from "~/lib/tournament.server";
-import type { MatchWithPlayers, Player } from "~/lib/types";
+import {
+  calculateStandings,
+  getKnockoutRoundUpdates,
+  getLeagueProgress,
+} from "~/lib/tournament.server";
+import type { Match, MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/matches";
 
 export function meta() {
@@ -33,10 +37,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     .from("matches")
     .select(
       `
-      *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
-    `
+        *,
+        player1:players!matches_player1_id_fkey(*),
+        player2:players!matches_player2_id_fkey(*)
+      `,
     )
     .order("phase")
     .order("created_at");
@@ -52,6 +56,65 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: matches } = await query;
 
   const allPlayers = (players as Player[]) || [];
+  let allMatches = (matches as MatchWithPlayers[]) || [];
+
+  // Auto-heal knockout progression in case earlier results were recorded before
+  // progression logic changes or intermediate inserts failed.
+  const knockoutMatches = allMatches.filter((m) => m.phase !== "league");
+  if (knockoutMatches.length > 0) {
+    const { data: leagueMatches } = await supabase
+      .from("matches")
+      .select(
+        `
+          *,
+          player1:players!matches_player1_id_fkey(*),
+          player2:players!matches_player2_id_fkey(*)
+        `,
+      )
+      .eq("phase", "league")
+      .eq("status", "completed");
+
+    const standings = calculateStandings(
+      allPlayers,
+      (leagueMatches as MatchWithPlayers[]) || [],
+    );
+    const updates = getKnockoutRoundUpdates(knockoutMatches as Match[], standings);
+
+    if (updates.deletes.length > 0) {
+      await supabase.from("matches").delete().in("id", updates.deletes);
+    }
+    if (updates.inserts.length > 0) {
+      await supabase.from("matches").insert(updates.inserts);
+    }
+
+    if (updates.deletes.length > 0 || updates.inserts.length > 0) {
+      let refreshedQuery = supabase
+        .from("matches")
+        .select(
+          `
+            *,
+            player1:players!matches_player1_id_fkey(*),
+            player2:players!matches_player2_id_fkey(*)
+          `,
+        )
+        .order("phase")
+        .order("created_at");
+
+      if (phase !== "all") {
+        refreshedQuery = refreshedQuery.eq("phase", phase);
+      }
+
+      if (playerId !== "all") {
+        refreshedQuery = refreshedQuery.or(
+          `player1_id.eq.${playerId},player2_id.eq.${playerId}`,
+        );
+      }
+
+      const { data: refreshedMatches } = await refreshedQuery;
+      allMatches = (refreshedMatches as MatchWithPlayers[]) || [];
+    }
+  }
+
   const leagueProgress = getLeagueProgress(
     allPlayers.length,
     completedLeagueMatches || 0
@@ -59,7 +122,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return data(
     {
-      matches: (matches as MatchWithPlayers[]) || [],
+      matches: allMatches,
       players: players || [],
       leagueProgress,
     },
