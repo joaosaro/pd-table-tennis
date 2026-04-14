@@ -392,38 +392,14 @@ export function getKnockoutRoundUpdates(
   } = { inserts: [], deletes: [] };
 
   for (const progression of KNOCKOUT_PROGRESSION) {
-    const phaseMatches = allKnockoutMatches.filter(
-      (m) => m.phase === progression.currentPhase,
-    );
-
-    // Check if we have all expected matches and all are completed
-    if (phaseMatches.length !== progression.expectedMatches) {
-      continue;
-    }
-
-    const allCompleted = phaseMatches.every((m) => m.status === "completed");
-    if (!allCompleted) {
-      continue;
-    }
-
-    // Get winners from completed phase
-    const winners = phaseMatches
-      .map((m) => m.winner_id!)
-      .filter((id) => id !== null);
-
-    if (winners.length !== progression.expectedMatches) {
-      continue;
-    }
-
-    // Generate the expected next round matchups
-    const expectedMatchups = generateNextRoundMatchups(
+    // Generate matchups that are ready based on currently completed paths.
+    // This supports progressive bracket creation (e.g. create top R2 as soon as
+    // both top R1 matches are complete, without waiting for bottom R1).
+    const expectedMatchups = generateReadyNextRoundMatchups(
       progression.nextPhase,
-      winners,
       standings,
       allKnockoutMatches,
     );
-
-    if (!expectedMatchups) continue;
 
     // Check if next phase already exists
     const nextPhaseMatches = allKnockoutMatches.filter(
@@ -435,35 +411,49 @@ export function getKnockoutRoundUpdates(
       (m) => m.status === "scheduled",
     );
 
-    // Helper to check if a matchup already exists in nextPhaseMatches (scheduled OR completed)
-    const matchupExists = (matchup: {
-      player1_id: string;
-      player2_id: string;
-    }) =>
-      nextPhaseMatches.some(
-        (existing) =>
-          (existing.player1_id === matchup.player1_id &&
-            existing.player2_id === matchup.player2_id) ||
-          (existing.player1_id === matchup.player2_id &&
-            existing.player2_id === matchup.player1_id),
-      );
-
-    // Find scheduled matches that don't match any expected matchup (stale matches)
-    const staleScheduledMatches = scheduledMatches.filter(
-      (existing) =>
-        !expectedMatchups.some(
-          (expected) =>
-            (existing.player1_id === expected.player1_id &&
-              existing.player2_id === expected.player2_id) ||
-            (existing.player1_id === expected.player2_id &&
-              existing.player2_id === expected.player1_id),
-        ),
+    const hasKnockoutPositions = expectedMatchups.some(
+      (matchup) => matchup.knockout_position !== undefined,
     );
+
+    const isSameMatchup = (
+      existing: { player1_id: string; player2_id: string },
+      expected: { player1_id: string; player2_id: string },
+    ) =>
+      (existing.player1_id === expected.player1_id &&
+        existing.player2_id === expected.player2_id) ||
+      (existing.player1_id === expected.player2_id &&
+        existing.player2_id === expected.player1_id);
+
+    // For bracketed rounds, reconcile by knockout_position so an already-known
+    // branch isn't deleted just because another branch isn't ready yet.
+    const staleScheduledMatches = hasKnockoutPositions
+      ? scheduledMatches.filter((existing) => {
+          if (existing.knockout_position === null) return false;
+          const expected = expectedMatchups.find(
+            (m) => m.knockout_position === existing.knockout_position,
+          );
+          if (!expected) return false; // Slot not ready yet, keep existing match.
+          return !isSameMatchup(existing, expected);
+        })
+      : scheduledMatches.filter(
+          (existing) =>
+            !expectedMatchups.some((expected) => isSameMatchup(existing, expected)),
+        );
 
     // Find expected matchups that don't exist yet (need to be created)
-    const missingMatchups = expectedMatchups.filter(
-      (expected) => !matchupExists(expected),
-    );
+    const missingMatchups = hasKnockoutPositions
+      ? expectedMatchups.filter((expected) => {
+          if (expected.knockout_position === undefined) return false;
+          return !nextPhaseMatches.some(
+            (existing) =>
+              existing.knockout_position === expected.knockout_position &&
+              isSameMatchup(existing, expected),
+          );
+        })
+      : expectedMatchups.filter(
+          (expected) =>
+            !nextPhaseMatches.some((existing) => isSameMatchup(existing, expected)),
+        );
 
     // Delete stale scheduled matches (wrong players due to edited results)
     if (staleScheduledMatches.length > 0) {
@@ -580,6 +570,119 @@ function generateNextRoundMatchups(
   }
 
   return null;
+}
+
+/**
+ * Generate next round matchups that are currently ready to be created.
+ * Unlike generateNextRoundMatchups, this can return partial matchups
+ * for bracketed phases as soon as each side is decided.
+ */
+function generateReadyNextRoundMatchups(
+  phase: string,
+  standings: PlayerStanding[],
+  allKnockoutMatches: Match[],
+): { player1_id: string; player2_id: string; knockout_position?: number }[] {
+  if (phase === "knockout_r2") {
+    const r1Matches = allKnockoutMatches.filter(
+      (m) => m.phase === "knockout_r1",
+    );
+
+    const pos1Winner = r1Matches.find((m) => m.knockout_position === 1)
+      ?.winner_id;
+    const pos2Winner = r1Matches.find((m) => m.knockout_position === 2)
+      ?.winner_id;
+    const pos3Winner = r1Matches.find((m) => m.knockout_position === 3)
+      ?.winner_id;
+    const pos4Winner = r1Matches.find((m) => m.knockout_position === 4)
+      ?.winner_id;
+
+    const matchups: {
+      player1_id: string;
+      player2_id: string;
+      knockout_position?: number;
+    }[] = [];
+
+    if (pos1Winner && pos2Winner) {
+      matchups.push({
+        player1_id: pos1Winner,
+        player2_id: pos2Winner,
+        knockout_position: 1,
+      });
+    }
+
+    if (pos3Winner && pos4Winner) {
+      matchups.push({
+        player1_id: pos3Winner,
+        player2_id: pos4Winner,
+        knockout_position: 2,
+      });
+    }
+
+    return matchups;
+  }
+
+  if (phase === "semifinal") {
+    const qualification = deriveStandingsQualification(standings);
+    const byePlayers = qualification.semifinalPlayerIds
+      .map((playerId) =>
+        standings.find((standing) => standing.player.id === playerId),
+      )
+      .filter((standing): standing is PlayerStanding => Boolean(standing));
+
+    if (byePlayers.length !== 2) return [];
+
+    const r2Matches = allKnockoutMatches.filter(
+      (m) => m.phase === "knockout_r2",
+    );
+    const topBracketWinner = r2Matches.find((m) => m.knockout_position === 1)
+      ?.winner_id;
+    const bottomBracketWinner = r2Matches.find((m) => m.knockout_position === 2)
+      ?.winner_id;
+
+    const matchups: {
+      player1_id: string;
+      player2_id: string;
+      knockout_position?: number;
+    }[] = [];
+
+    if (topBracketWinner) {
+      matchups.push({
+        player1_id: byePlayers[0].player.id,
+        player2_id: topBracketWinner,
+        knockout_position: 1,
+      });
+    }
+
+    if (bottomBracketWinner) {
+      matchups.push({
+        player1_id: byePlayers[1].player.id,
+        player2_id: bottomBracketWinner,
+        knockout_position: 2,
+      });
+    }
+
+    return matchups;
+  }
+
+  if (phase === "final") {
+    const semifinalMatches = allKnockoutMatches.filter(
+      (m) => m.phase === "semifinal",
+    );
+    const semifinalWinners = semifinalMatches
+      .map((m) => m.winner_id)
+      .filter((winnerId): winnerId is string => Boolean(winnerId));
+
+    if (semifinalWinners.length !== 2) return [];
+
+    return [
+      {
+        player1_id: semifinalWinners[0],
+        player2_id: semifinalWinners[1],
+      },
+    ];
+  }
+
+  return [];
 }
 
 /**
