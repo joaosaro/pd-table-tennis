@@ -60,10 +60,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     completedLeagueMatches || 0
   );
 
-  if (
-    leagueProgress.isFinished &&
-    (match.phase === "league" || match.status !== "scheduled")
-  ) {
+  if (leagueProgress.isFinished && match.phase === "league") {
     return redirect("/editor/matches", { headers });
   }
 
@@ -133,12 +130,9 @@ export async function action({ request, params }: Route.ActionArgs) {
     completedLeagueMatches || 0
   );
 
-  if (
-    leagueProgress.isFinished &&
-    (match.phase === "league" || match.status !== "scheduled")
-  ) {
+  if (leagueProgress.isFinished && match.phase === "league") {
     return {
-      error: "Only open knockout matches can be submitted after the league is complete.",
+      error: "League matches cannot be submitted after the league is complete.",
     };
   }
 
