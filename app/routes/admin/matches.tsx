@@ -14,12 +14,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
   const { data: matches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `
     )
     .order("phase")
@@ -37,19 +37,19 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "delete") {
     const id = formData.get("id") as string;
-    await supabase.from("matches").delete().eq("id", id);
+    await supabase.from("edition_matches").delete().eq("id", id);
   }
 
   if (intent === "delete_all_league") {
-    await supabase.from("matches").delete().eq("phase", "league");
+    await supabase.from("edition_matches").delete().eq("phase", "league");
   }
 
   if (intent === "delete_all_knockout") {
-    await supabase.from("matches").delete().neq("phase", "league");
+    await supabase.from("edition_matches").delete().neq("phase", "league");
   }
 
   if (intent === "reset_tournament") {
-    await supabase.from("matches").delete().neq("id", "");
+    await supabase.from("edition_matches").delete().neq("id", "");
   }
 
   const allHeaders = new Headers(authHeaders);

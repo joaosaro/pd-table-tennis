@@ -28,18 +28,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     .order("name", { ascending: true });
 
   const { count: completedLeagueMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
 
   let query = supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
         *,
-        player1:players!matches_player1_id_fkey(*),
-        player2:players!matches_player2_id_fkey(*)
+        player1:players!edition_matches_player1_id_fkey(*),
+        player2:players!edition_matches_player2_id_fkey(*)
       `,
     )
     .order("phase")
@@ -63,12 +63,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const knockoutMatches = allMatches.filter((m) => m.phase !== "league");
   if (knockoutMatches.length > 0) {
     const { data: leagueMatches } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .select(
         `
           *,
-          player1:players!matches_player1_id_fkey(*),
-          player2:players!matches_player2_id_fkey(*)
+          player1:players!edition_matches_player1_id_fkey(*),
+          player2:players!edition_matches_player2_id_fkey(*)
         `,
       )
       .eq("phase", "league")
@@ -81,20 +81,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     const updates = getKnockoutRoundUpdates(knockoutMatches as Match[], standings);
 
     if (updates.deletes.length > 0) {
-      await supabase.from("matches").delete().in("id", updates.deletes);
+      await supabase.from("edition_matches").delete().in("id", updates.deletes);
     }
     if (updates.inserts.length > 0) {
-      await supabase.from("matches").insert(updates.inserts);
+      await supabase.from("edition_matches").insert(updates.inserts);
     }
 
     if (updates.deletes.length > 0 || updates.inserts.length > 0) {
       let refreshedQuery = supabase
-        .from("matches")
+        .from("edition_matches")
         .select(
           `
             *,
-            player1:players!matches_player1_id_fkey(*),
-            player2:players!matches_player2_id_fkey(*)
+            player1:players!edition_matches_player1_id_fkey(*),
+            player2:players!edition_matches_player2_id_fkey(*)
           `,
         )
         .order("phase")

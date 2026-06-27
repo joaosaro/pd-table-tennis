@@ -8,6 +8,7 @@ import {
 } from "react-router";
 import { useState } from "react";
 import { requireRole } from "~/lib/auth.server";
+import { syncEditionMatchToElo } from "~/lib/elo-sync.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { getLeagueProgress } from "~/lib/tournament.server";
 import type { Player } from "~/lib/types";
@@ -29,7 +30,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     .order("name");
 
   const { data: completedMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("player1_id, player2_id")
     .eq("phase", "league")
     .eq("status", "completed");
@@ -81,7 +82,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { data: players } = await supabase.from("players").select("id");
   const { count: completedLeagueMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
@@ -99,7 +100,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   // Check if this match already exists
   const { data: existingMatch } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("id")
     .eq("phase", "league")
     .or(
@@ -145,24 +146,33 @@ export async function action({ request }: Route.ActionArgs) {
   const winnerId = p1Sets > p2Sets ? player1Id : player2Id;
 
   // Create the match with result in one step
-  const { error } = await supabase.from("matches").insert({
-    player1_id: player1Id,
-    player2_id: player2Id,
-    phase: "league",
-    status: "completed",
-    set1_p1,
-    set1_p2,
-    set2_p1,
-    set2_p2,
-    set3_p1,
-    set3_p2,
-    winner_id: winnerId,
-    recorded_by: user.id,
-    recorded_at: new Date().toISOString(),
-  });
+  const recordedAt = new Date().toISOString();
+  const { data: createdMatch, error } = await supabase
+    .from("edition_matches")
+    .insert({
+      player1_id: player1Id,
+      player2_id: player2Id,
+      phase: "league",
+      status: "completed",
+      set1_p1,
+      set1_p2,
+      set2_p1,
+      set2_p2,
+      set3_p1,
+      set3_p2,
+      winner_id: winnerId,
+      recorded_by: user.id,
+      recorded_at: recordedAt,
+    })
+    .select("*")
+    .single();
 
   if (error) {
     return { error: error.message };
+  }
+
+  if (createdMatch) {
+    await syncEditionMatchToElo(supabase, createdMatch);
   }
 
   const allHeaders = new Headers(authHeaders);

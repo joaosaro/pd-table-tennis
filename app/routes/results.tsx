@@ -29,12 +29,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     .order("name", { ascending: true });
 
   let query = supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
     .order("created_at", { ascending: false });

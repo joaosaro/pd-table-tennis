@@ -36,38 +36,38 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Get all completed league matches for standings
   const { data: leagueMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
     .eq("phase", "league")
     .eq("status", "completed");
 
   const { count: completedMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
 
   const { count: remainingKnockoutMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .neq("phase", "league")
     .eq("status", "scheduled");
 
   // Get recent results (last 5 completed matches)
   const { data: recentMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*),
-      winner:players!matches_winner_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*),
+      winner:players!edition_matches_winner_id_fkey(*)
     `,
     )
     .eq("status", "completed")
@@ -220,6 +220,10 @@ export default function Home() {
       </section>
 
       <section className="quick-links">
+        <Link to="/leaderboard" className="quick-link-card">
+          <h3>Leaderboard</h3>
+          <p>View ongoing ELO ratings</p>
+        </Link>
         <Link to="/standings" className="quick-link-card">
           <h3>Standings</h3>
           <p>View current league rankings</p>

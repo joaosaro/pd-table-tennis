@@ -10,6 +10,19 @@ export type MatchPhase =
   | "final";
 
 export type MatchStatus = "scheduled" | "completed";
+export type EditionStatus = "active" | "archived";
+export type EloMatchSourceType = "edition_match" | "manual";
+
+export interface Edition {
+  id: string;
+  name: string;
+  status: EditionStatus;
+  starts_on: string | null;
+  ends_on: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Player {
   id: string;
@@ -45,6 +58,7 @@ export interface TournamentSettings {
 
 export interface Match {
   id: string;
+  edition_id: string;
   player1_id: string;
   player2_id: string;
   phase: MatchPhase;
@@ -68,6 +82,42 @@ export interface MatchWithPlayers extends Match {
   player1: Player;
   player2: Player;
   winner?: Player | null;
+}
+
+export interface EloMatch {
+  id: string;
+  source_type: EloMatchSourceType;
+  source_match_id: string | null;
+  player1_id: string;
+  player2_id: string;
+  winner_id: string;
+  played_at: string;
+  set1_p1: number | null;
+  set1_p2: number | null;
+  set2_p1: number | null;
+  set2_p2: number | null;
+  set3_p1: number | null;
+  set3_p2: number | null;
+  notes: string | null;
+  recorded_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EloMatchWithPlayers extends EloMatch {
+  player1: Player;
+  player2: Player;
+  winner?: Player | null;
+}
+
+export interface EloStanding {
+  player: Player;
+  rank: number;
+  rating: number;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  lastPlayedAt: string | null;
 }
 
 // App user (simplified for UI)

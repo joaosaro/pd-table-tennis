@@ -18,6 +18,9 @@ export function Header({ user }: HeaderProps) {
         </Link>
 
         <nav className="header-nav">
+          <Link to="/leaderboard" className="nav-link">
+            Leaderboard
+          </Link>
           <Link to="/standings" className="nav-link">
             Standings
           </Link>

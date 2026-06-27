@@ -22,12 +22,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Get all league matches to calculate standings
   const { data: leagueMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
     .eq("phase", "league")
@@ -35,19 +35,19 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Check if league phase is still active (has incomplete matches)
   const { count: incompleteLeagueCount } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "scheduled");
 
   // Get knockout matches
   const { data: knockoutMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
     .neq("phase", "league");
