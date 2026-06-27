@@ -9,7 +9,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Fetch all completed matches with player details
   const { data: matches, error } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       id,
@@ -23,8 +23,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       set3_p2,
       winner_id,
       recorded_at,
-      player1:players!matches_player1_id_fkey(id, name, department, tier),
-      player2:players!matches_player2_id_fkey(id, name, department, tier)
+      player1:players!edition_matches_player1_id_fkey(id, name, department, tier),
+      player2:players!edition_matches_player2_id_fkey(id, name, department, tier)
     `
     )
     .eq("status", "completed")

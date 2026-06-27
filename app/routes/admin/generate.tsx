@@ -28,23 +28,23 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: players } = await supabase.from("players").select("*");
 
   const { count: knockoutMatchCount } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .neq("phase", "league");
 
   const { count: completedKnockoutMatchCount } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .neq("phase", "league")
     .eq("status", "completed");
 
   const { data: leagueMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
     .eq("phase", "league")
@@ -90,7 +90,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "generate_knockout") {
     // Check if knockout matches already exist
     const { count: existingKnockout } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .select("*", { count: "exact", head: true })
       .neq("phase", "league");
 
@@ -104,12 +104,12 @@ export async function action({ request }: Route.ActionArgs) {
     const { data: players } = await supabase.from("players").select("*");
 
     const { data: leagueMatches } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .select(
         `
         *,
-        player1:players!matches_player1_id_fkey(*),
-        player2:players!matches_player2_id_fkey(*)
+        player1:players!edition_matches_player1_id_fkey(*),
+        player2:players!edition_matches_player2_id_fkey(*)
       `,
       )
       .eq("phase", "league")
@@ -135,7 +135,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     const knockoutMatches = buildInitialKnockoutMatches(qualified);
 
-    const { error } = await supabase.from("matches").insert(knockoutMatches);
+    const { error } = await supabase.from("edition_matches").insert(knockoutMatches);
 
     if (error) {
       return { error: error.message };
@@ -148,7 +148,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "repair_knockout") {
     const { data: existingKnockoutMatches } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .select("id, status")
       .neq("phase", "league");
 
@@ -168,12 +168,12 @@ export async function action({ request }: Route.ActionArgs) {
     const { data: players } = await supabase.from("players").select("*");
 
     const { data: leagueMatches } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .select(
         `
         *,
-        player1:players!matches_player1_id_fkey(*),
-        player2:players!matches_player2_id_fkey(*)
+        player1:players!edition_matches_player1_id_fkey(*),
+        player2:players!edition_matches_player2_id_fkey(*)
       `,
       )
       .eq("phase", "league")
@@ -198,7 +198,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     const { error: deleteError } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .delete()
       .neq("phase", "league");
 
@@ -208,7 +208,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     const repairedMatches = buildInitialKnockoutMatches(qualified);
     const { error: insertError } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .insert(repairedMatches);
 
     if (insertError) {

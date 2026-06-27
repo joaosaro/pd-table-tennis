@@ -26,12 +26,12 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Get all completed league matches
   const { data: matches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
     .eq("phase", "league")

@@ -7,6 +7,7 @@ import {
   useNavigation,
 } from "react-router";
 import { requireRole } from "~/lib/auth.server";
+import { syncEditionMatchToElo } from "~/lib/elo-sync.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
@@ -33,12 +34,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
   const { data: match } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `
     )
     .eq("id", params.matchId)
@@ -50,7 +51,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: players } = await supabase.from("players").select("id");
   const { count: completedLeagueMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
@@ -109,7 +110,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // Get the match to determine winner and phase
   const { data: match } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("player1_id, player2_id, phase, status")
     .eq("id", params.matchId)
     .single();
@@ -120,7 +121,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { data: players } = await supabase.from("players").select("id");
   const { count: completedLeagueMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
@@ -137,9 +138,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   const winnerId = p1Sets > p2Sets ? match.player1_id : match.player2_id;
+  const recordedAt = new Date().toISOString();
 
-  const { error } = await supabase
-    .from("matches")
+  const { data: updatedMatch, error } = await supabase
+    .from("edition_matches")
     .update({
       set1_p1,
       set1_p2,
@@ -150,19 +152,25 @@ export async function action({ request, params }: Route.ActionArgs) {
       winner_id: winnerId,
       status: "completed",
       recorded_by: user.id,
-      recorded_at: new Date().toISOString(),
+      recorded_at: recordedAt,
     })
-    .eq("id", params.matchId);
+    .eq("id", params.matchId)
+    .select("*")
+    .single();
 
   if (error) {
     return { error: error.message };
+  }
+
+  if (updatedMatch) {
+    await syncEditionMatchToElo(supabase, updatedMatch);
   }
 
   // Check if this was a knockout match and generate next round if needed
   if (match.phase !== "league") {
     // Get all knockout matches to check progression
     const { data: knockoutMatches } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .select("*")
       .neq("phase", "league");
 
@@ -176,12 +184,12 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Get standings for seeding
     const { data: players } = await supabase.from("players").select("*");
     const { data: leagueMatches } = await supabase
-      .from("matches")
+      .from("edition_matches")
       .select(
         `
         *,
-        player1:players!matches_player1_id_fkey(*),
-        player2:players!matches_player2_id_fkey(*)
+        player1:players!edition_matches_player1_id_fkey(*),
+        player2:players!edition_matches_player2_id_fkey(*)
       `
       )
       .eq("phase", "league")
@@ -201,7 +209,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Delete stale scheduled matches first
     if (roundUpdates.deletes.length > 0) {
       const { error: deleteError } = await supabase
-        .from("matches")
+        .from("edition_matches")
         .delete()
         .in("id", roundUpdates.deletes);
 
@@ -213,7 +221,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Insert new/updated matches
     if (roundUpdates.inserts.length > 0) {
       const { error: insertError } = await supabase
-        .from("matches")
+        .from("edition_matches")
         .insert(roundUpdates.inserts);
 
       if (insertError) {

@@ -17,11 +17,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*", { count: "exact", head: true });
 
   const { count: totalMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true });
 
   const { count: completedMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .eq("status", "completed");
 

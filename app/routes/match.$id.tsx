@@ -22,12 +22,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
   const { data: match } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!matches_player1_id_fkey(*),
-      player2:players!matches_player2_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `
     )
     .eq("id", params.id)
@@ -40,7 +40,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const { data: players } = await supabase.from("players").select("id");
   const { count: completedLeagueMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");

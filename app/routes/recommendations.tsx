@@ -26,7 +26,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     .order("name");
 
   const { data: completedMatches } = await supabase
-    .from("matches")
+    .from("edition_matches")
     .select("player1_id, player2_id")
     .eq("phase", "league")
     .eq("status", "completed");
