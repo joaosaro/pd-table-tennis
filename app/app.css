@@ -695,6 +695,16 @@ body {
   gap: 0.5rem;
 }
 
+.results-pagination-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+  flex-wrap: wrap;
+}
+
 .result-card {
   display: flex;
   justify-content: space-between;
@@ -1872,6 +1882,8 @@ body {
 }
 
 @media (prefers-color-scheme: dark) {
+  .results-pagination-summary,
+  .results-pagination-current,
   .results-date {
     color: var(--color-gray-300);
   }
@@ -1882,6 +1894,25 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.results-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.results-pagination-current {
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+}
+
+.results-pagination .disabled {
+  pointer-events: none;
+  opacity: 0.5;
 }
 
 .phase-badge {

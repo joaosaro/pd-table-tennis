@@ -7,14 +7,18 @@ import {
 import { formatEditionLabel } from "~/lib/editions";
 import {
   getEditionForRequest,
+  listEditions,
 } from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type {
   AppUser,
+  Edition,
   EloMatchWithPlayers,
   MatchWithPlayers,
 } from "~/lib/types";
 import type { Route } from "./+types/results";
+
+const RESULTS_PER_PAGE = 20;
 
 type ResultItem = {
   id: string;
@@ -50,13 +54,15 @@ export function meta() {
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const url = new URL(request.url);
-  const edition = await getEditionForRequest(
-    supabase,
-    url.searchParams.get("edition"),
-  );
+  const requestedEditionId = url.searchParams.get("edition");
+  const [editions, edition] = await Promise.all([
+    listEditions(supabase),
+    getEditionForRequest(supabase, requestedEditionId),
+  ]);
   const status = url.searchParams.get("status") || "all";
   const phase = url.searchParams.get("phase") || "all";
   const playerId = url.searchParams.get("player") || "all";
+  const requestedPage = Number(url.searchParams.get("page") || "1");
 
   if (!edition) {
     throw new Response("Edition not found", { status: 404 });
@@ -173,18 +179,44 @@ export async function loader({ request }: Route.LoaderArgs) {
     return new Date(bDate).getTime() - new Date(aDate).getTime();
   });
 
+  const totalResults = results.length;
+  const totalPages = Math.max(1, Math.ceil(totalResults / RESULTS_PER_PAGE));
+  const currentPage =
+    Number.isFinite(requestedPage) && requestedPage > 0
+      ? Math.min(Math.floor(requestedPage), totalPages)
+      : 1;
+  const pageResults = results.slice(
+    (currentPage - 1) * RESULTS_PER_PAGE,
+    currentPage * RESULTS_PER_PAGE,
+  );
+
   return {
     edition,
-    results,
+    editions,
+    results: pageResults,
+    totalResults,
     completedCount: completedResults.length,
     scheduledCount: scheduledResults.length,
     players: players || [],
+    pagination: {
+      currentPage,
+      totalPages,
+      perPage: RESULTS_PER_PAGE,
+    },
   };
 }
 
 export default function Results() {
-  const { edition, results, completedCount, scheduledCount, players } =
-    useLoaderData<typeof loader>();
+  const {
+    edition,
+    editions,
+    results,
+    totalResults,
+    completedCount,
+    scheduledCount,
+    players,
+    pagination,
+  } = useLoaderData<typeof loader>();
   const { user } = useOutletContext<{ user: AppUser | null }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const showArchivedLeagueTier = edition.status === "archived";
@@ -192,6 +224,7 @@ export default function Results() {
   const currentStatus = searchParams.get("status") || "all";
   const currentPhase = searchParams.get("phase") || "all";
   const currentPlayer = searchParams.get("player") || "all";
+  const currentEdition = searchParams.get("edition") || edition.id;
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
@@ -202,7 +235,20 @@ export default function Results() {
     } else {
       newParams.set(key, value);
     }
+    newParams.delete("page");
     setSearchParams(newParams);
+  }
+
+  function getPageHref(page: number) {
+    const newParams = new URLSearchParams(searchParams);
+    if (page <= 1) {
+      newParams.delete("page");
+    } else {
+      newParams.set("page", String(page));
+    }
+
+    const query = newParams.toString();
+    return query ? `/results?${query}` : "/results";
   }
 
   return (
@@ -232,6 +278,20 @@ export default function Results() {
       )}
 
       <div className="results-filters">
+        <div className="filter-group">
+          <label>Season:</label>
+          <select
+            value={currentEdition}
+            onChange={(e) => updateFilter("edition", e.target.value)}
+            className="form-select"
+          >
+            {editions.map((season) => (
+              <option key={season.id} value={season.id}>
+                {getEditionOptionLabel(season)}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="filter-group">
           <label>Status:</label>
           <select
@@ -279,18 +339,77 @@ export default function Results() {
       {results.length === 0 ? (
         <p className="empty">No matches found.</p>
       ) : (
-        <div className="results-list">
-          {results.map((match) => (
-            <ResultCard
-              key={match.id}
-              match={match}
-              showArchivedLeagueTier={showArchivedLeagueTier}
-            />
-          ))}
-        </div>
+        <>
+          <div className="results-pagination-summary">
+            <span>
+              Showing{" "}
+              {Math.min(
+                (pagination.currentPage - 1) * pagination.perPage + 1,
+                totalResults,
+              )}{" "}
+              -{" "}
+              {Math.min(
+                pagination.currentPage * pagination.perPage,
+                totalResults,
+              )}{" "}
+              of {totalResults}
+            </span>
+            <span>
+              Page {pagination.currentPage} of {pagination.totalPages}
+            </span>
+          </div>
+          <div className="results-list">
+            {results.map((match) => (
+              <ResultCard
+                key={match.id}
+                match={match}
+                showArchivedLeagueTier={showArchivedLeagueTier}
+              />
+            ))}
+          </div>
+          {pagination.totalPages > 1 ? (
+            <div className="results-pagination">
+              <Link
+                to={getPageHref(pagination.currentPage - 1)}
+                className={`btn btn-secondary ${
+                  pagination.currentPage === 1 ? "disabled" : ""
+                }`}
+                aria-disabled={pagination.currentPage === 1}
+                tabIndex={pagination.currentPage === 1 ? -1 : undefined}
+              >
+                Previous
+              </Link>
+              <span className="results-pagination-current">
+                Page {pagination.currentPage} / {pagination.totalPages}
+              </span>
+              <Link
+                to={getPageHref(pagination.currentPage + 1)}
+                className={`btn btn-secondary ${
+                  pagination.currentPage === pagination.totalPages
+                    ? "disabled"
+                    : ""
+                }`}
+                aria-disabled={pagination.currentPage === pagination.totalPages}
+                tabIndex={
+                  pagination.currentPage === pagination.totalPages
+                    ? -1
+                    : undefined
+                }
+              >
+                Next
+              </Link>
+            </div>
+          ) : null}
+        </>
       )}
     </main>
   );
+}
+
+function getEditionOptionLabel(edition: Edition): string {
+  return edition.status === "active"
+    ? `${formatEditionLabel(edition)} (Current)`
+    : formatEditionLabel(edition);
 }
 
 function ResultCard({
