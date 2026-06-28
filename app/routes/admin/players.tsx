@@ -61,6 +61,7 @@ export default function AdminPlayers() {
               <th>Department</th>
               <th>Slack</th>
               <th className="text-center">Tier</th>
+              <th>Status</th>
               <th className="text-right">Actions</th>
             </tr>
           </thead>
@@ -77,6 +78,7 @@ export default function AdminPlayers() {
                     {player.tier}
                   </span>
                 </td>
+                <td>{player.disabled ? "Disabled" : "Active"}</td>
                 <td className="text-right">
                   <div className="action-buttons">
                     <Link

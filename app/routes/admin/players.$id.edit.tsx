@@ -46,6 +46,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const slackHandleRaw = (formData.get("slack_handle") as string) || "";
   const slack_handle = normalizeSlackHandle(slackHandleRaw);
   const tier = parseInt(formData.get("tier") as string) || 4;
+  const disabled = formData.get("disabled") === "on";
   const disqualifiedFromQualification =
     formData.get("disqualified_from_qualification") === "on";
   const disqualificationNote =
@@ -68,6 +69,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       department,
       slack_handle,
       tier,
+      disabled,
       disqualified_from_qualification: disqualifiedFromQualification,
       disqualification_note: disqualifiedFromQualification
         ? disqualificationNote
@@ -159,6 +161,19 @@ export default function AdminPlayersEdit() {
             <option value="3">Tier 3 (2 pts)</option>
             <option value="4">Tier 4 (Easiest - 1 pt)</option>
           </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="disabled">
+            <input
+              type="checkbox"
+              id="disabled"
+              name="disabled"
+              defaultChecked={player.disabled}
+              disabled={isSubmitting}
+            />{" "}
+            Disabled (left Pipedrive)
+          </label>
         </div>
 
         <div className="form-group">

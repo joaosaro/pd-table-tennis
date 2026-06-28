@@ -16,6 +16,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: players, error } = await supabase
     .from("players")
     .select("*")
+    .eq("disabled", false)
     .order("tier", { ascending: true })
     .order("name", { ascending: true });
 
