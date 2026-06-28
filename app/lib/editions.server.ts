@@ -123,7 +123,3 @@ async function attachChampions(
     };
   });
 }
-
-export function formatEditionLabel(edition: Pick<Edition, "season">) {
-  return `Session ${edition.season}`;
-}

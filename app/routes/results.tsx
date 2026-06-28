@@ -4,8 +4,8 @@ import {
   useOutletContext,
   useSearchParams,
 } from "react-router";
+import { formatEditionLabel } from "~/lib/editions";
 import {
-  formatEditionLabel,
   getEditionForRequest,
 } from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";

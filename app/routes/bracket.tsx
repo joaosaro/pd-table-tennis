@@ -1,6 +1,6 @@
 import { Link, redirect, useLoaderData } from "react-router";
+import { formatEditionLabel } from "~/lib/editions";
 import {
-  formatEditionLabel,
   getActiveEdition,
   getEditionForRequest,
 } from "~/lib/editions.server";

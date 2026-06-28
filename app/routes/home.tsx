@@ -1,6 +1,6 @@
 import { Link, useLoaderData, useOutletContext } from "react-router";
+import { formatEditionLabel } from "~/lib/editions";
 import {
-  formatEditionLabel,
   getActiveEdition,
   listArchivedEditionSummaries,
 } from "~/lib/editions.server";

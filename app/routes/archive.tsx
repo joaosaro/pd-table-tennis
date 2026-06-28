@@ -1,6 +1,6 @@
 import { Link, useLoaderData } from "react-router";
+import { formatEditionLabel } from "~/lib/editions";
 import {
-  formatEditionLabel,
   listArchivedEditionSummaries,
 } from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
