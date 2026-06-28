@@ -4,14 +4,12 @@ import {
   getActiveEdition,
   listArchivedEditionSummaries,
 } from "~/lib/editions.server";
+import { calculateEloStandings } from "~/lib/elo.server";
+import { legacyArchiveEntries } from "~/lib/legacy-archive";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import {
-  calculateStandings,
-  deriveStandingsQualification,
-} from "~/lib/tournament.server";
 import type {
   AppUser,
-  MatchWithPlayers,
+  EloMatchWithPlayers,
   Player,
   TournamentSettings,
 } from "~/lib/types";
@@ -34,7 +32,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*")
     .single();
 
-  // Get all players for standings
+  // Get all players for the home page and ELO leaderboard
   const { data: players } = await supabase
     .from("players")
     .select("*")
@@ -68,34 +66,37 @@ export async function loader({ request }: Route.LoaderArgs) {
     .neq("phase", "league")
     .eq("status", "scheduled");
 
-  // Get recent results (last 5 completed matches)
+  // Get recent ELO results (last 5 completed matches by played date)
   const { data: recentMatches } = await supabase
-    .from("edition_matches")
+    .from("elo_matches")
     .select(
       `
       *,
-      player1:players!edition_matches_player1_id_fkey(*),
-      player2:players!edition_matches_player2_id_fkey(*),
-      winner:players!edition_matches_winner_id_fkey(*)
+      player1:players!elo_matches_player1_id_fkey(*),
+      player2:players!elo_matches_player2_id_fkey(*),
+      winner:players!elo_matches_winner_id_fkey(*)
     `,
     )
-    .eq("edition_id", activeEdition?.id || "")
-    .eq("status", "completed")
-    .order("recorded_at", { ascending: false })
-    .limit(7);
+    .order("played_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(5);
 
-  // Calculate standings
-  const standings = calculateStandings(
+  const { data: eloMatches } = await supabase
+    .from("elo_matches")
+    .select(
+      `
+      *,
+      player1:players!elo_matches_player1_id_fkey(*),
+      player2:players!elo_matches_player2_id_fkey(*),
+      winner:players!elo_matches_winner_id_fkey(*)
+    `,
+    )
+    .order("played_at", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  const leaderboard = calculateEloStandings(
     (players as Player[]) || [],
-    (leagueMatches as MatchWithPlayers[]) || [],
-  );
-  const qualification = deriveStandingsQualification(standings);
-  const standingsPreviewLimit = Math.max(
-    10,
-    ...qualification.qualifiedPlayerIds.map((playerId) => {
-      const standing = standings.find((entry) => entry.player.id === playerId);
-      return standing?.rank || 0;
-    }),
+    (eloMatches as EloMatchWithPlayers[]) || [],
   );
 
   // Calculate unique players who have played at least one league match
@@ -112,9 +113,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     completedMatches: completedMatches || 0,
     remainingKnockoutMatches: remainingKnockoutMatches || 0,
     playersWhoPlayed,
-    recentMatches: (recentMatches as MatchWithPlayers[]) || [],
-    standings: standings.slice(0, standingsPreviewLimit),
-    qualification,
+    recentMatches: (recentMatches as EloMatchWithPlayers[]) || [],
+    leaderboard: leaderboard.slice(0, 8),
   };
 }
 
@@ -128,11 +128,11 @@ export default function Home() {
     remainingKnockoutMatches,
     playersWhoPlayed,
     recentMatches,
-    standings,
-    qualification,
+    leaderboard,
   } = useLoaderData<typeof loader>();
   const { user } = useOutletContext<{ user: AppUser | null }>();
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  const archivePreviewEntries = [...archivedEditions, ...legacyArchiveEntries];
 
   return (
     <main className="home-page">
@@ -177,7 +177,11 @@ export default function Home() {
             <div className="results-list">
               {recentMatches.map((match) => (
                 <Link
-                  to={`/match/${match.id}`}
+                  to={
+                    match.source_match_id
+                      ? `/match/${match.source_match_id}`
+                      : "/results"
+                  }
                   key={match.id}
                   className="result-card"
                 >
@@ -209,34 +213,29 @@ export default function Home() {
 
         <div className="home-column">
           <div className="column-header">
-            <h2>Archive</h2>
-            <Link to="/archive" className="view-all-link">
+            <h2>Leaderboard ELO</h2>
+            <Link to="/leaderboard" className="view-all-link">
               View all
             </Link>
           </div>
-          {activeEdition && standings.length > 0 ? (
+          {leaderboard.length > 0 ? (
             <div className="mini-standings">
-              {standings.slice(0, 5).map((standing) => (
+              {leaderboard.map((standing) => (
                 <Link
                   key={standing.player.id}
                   to={`/player/${standing.player.id}`}
-                  className={`mini-standing-row ${getRankClass(
-                    standing.player.id,
-                    qualification,
-                  )}`}
+                  className="mini-standing-row"
                 >
                   <span className="mini-rank">{standing.rank}</span>
                   <span className="mini-player-name">
                     {standing.player.name}
                   </span>
-                  <span className="mini-points">{standing.points} pts</span>
+                  <span className="mini-points">{standing.rating}</span>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="empty">
-              Standings and bracket are available from the archive.
-            </p>
+            <p className="empty">No rated matches yet.</p>
           )}
         </div>
       </section>
@@ -265,7 +264,7 @@ export default function Home() {
         )}
       </section>
 
-      {archivedEditions.length > 0 && (
+      {archivePreviewEntries.length > 0 && (
         <section className="archive-preview">
           <div className="column-header">
             <h2>Previous Sessions</h2>
@@ -296,6 +295,34 @@ export default function Home() {
                 </div>
               </article>
             ))}
+            {legacyArchiveEntries.map((edition) => (
+              <article key={edition.id} className="archive-card">
+                <div className="archive-card-header">
+                  <div>
+                    <h3>{formatEditionLabel(edition)}</h3>
+                    <p>{edition.name}</p>
+                  </div>
+                  <span className="archive-champion-badge">Champion</span>
+                </div>
+                <div className="archive-card-body">
+                  <p className="archive-champion-name">
+                    {edition.championName}
+                  </p>
+                </div>
+                <div className="archive-card-links">
+                  {edition.links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       )}
@@ -303,19 +330,7 @@ export default function Home() {
   );
 }
 
-function getRankClass(
-  playerId: string,
-  qualification: Route.ComponentProps["loaderData"]["qualification"],
-): string {
-  if (qualification.semifinalPlayerIds.includes(playerId)) {
-    return "rank-semifinal";
-  }
-  if (qualification.knockoutPlayerIds.includes(playerId))
-    return "rank-knockout";
-  return "";
-}
-
-function getMatchScore(match: MatchWithPlayers): string {
+function getMatchScore(match: EloMatchWithPlayers): string {
   let p1Sets = 0;
   let p2Sets = 0;
 
