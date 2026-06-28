@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS editions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
+  season INTEGER NOT NULL DEFAULT 3 CHECK (season > 0),
   status TEXT NOT NULL DEFAULT 'archived' CHECK (status IN ('active', 'archived')),
   starts_on DATE,
   ends_on DATE,
@@ -45,10 +46,11 @@ CREATE TABLE IF NOT EXISTS editions (
 );
 
 -- Seed the current archived edition for existing tournament matches.
-INSERT INTO editions (id, name, status, archived_at)
+INSERT INTO editions (id, name, season, status, archived_at)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
   'PD Table Tennis 2025',
+  3,
   'archived',
   NOW()
 )
@@ -73,6 +75,7 @@ ON CONFLICT (id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS edition_matches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   edition_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES editions(id) ON DELETE RESTRICT,
+  season INTEGER NOT NULL DEFAULT 3 CHECK (season > 0),
   player1_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   player2_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   phase TEXT NOT NULL CHECK (phase IN ('league', 'knockout_r1', 'knockout_r2', 'semifinal', 'final')),
@@ -100,6 +103,7 @@ CREATE TABLE IF NOT EXISTS elo_matches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   source_type TEXT NOT NULL DEFAULT 'manual' CHECK (source_type IN ('edition_match', 'manual')),
   source_match_id UUID REFERENCES edition_matches(id) ON DELETE SET NULL,
+  season INTEGER NOT NULL DEFAULT 3 CHECK (season > 0),
   player1_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   player2_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   winner_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -130,6 +134,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_elo_matches_source_match
 INSERT INTO elo_matches (
   source_type,
   source_match_id,
+  season,
   player1_id,
   player2_id,
   winner_id,
@@ -147,6 +152,7 @@ INSERT INTO elo_matches (
 SELECT
   'edition_match',
   id,
+  season,
   player1_id,
   player2_id,
   winner_id,
@@ -179,12 +185,14 @@ CREATE TABLE IF NOT EXISTS weekly_recommendations (
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_edition_matches_edition ON edition_matches(edition_id);
+CREATE INDEX IF NOT EXISTS idx_edition_matches_season ON edition_matches(season);
 CREATE INDEX IF NOT EXISTS idx_edition_matches_player1 ON edition_matches(player1_id);
 CREATE INDEX IF NOT EXISTS idx_edition_matches_player2 ON edition_matches(player2_id);
 CREATE INDEX IF NOT EXISTS idx_edition_matches_phase ON edition_matches(phase);
 CREATE INDEX IF NOT EXISTS idx_edition_matches_status ON edition_matches(status);
 CREATE INDEX IF NOT EXISTS idx_elo_matches_player1 ON elo_matches(player1_id);
 CREATE INDEX IF NOT EXISTS idx_elo_matches_player2 ON elo_matches(player2_id);
+CREATE INDEX IF NOT EXISTS idx_elo_matches_season ON elo_matches(season);
 CREATE INDEX IF NOT EXISTS idx_elo_matches_played_at ON elo_matches(played_at);
 CREATE INDEX IF NOT EXISTS idx_players_tier ON players(tier);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_players_slack_handle ON players(slack_handle);

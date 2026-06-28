@@ -5,8 +5,36 @@ import {
   useSearchParams,
 } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { AppUser, MatchWithPlayers } from "~/lib/types";
+import type {
+  AppUser,
+  EloMatchWithPlayers,
+  MatchWithPlayers,
+} from "~/lib/types";
 import type { Route } from "./+types/results";
+
+type ResultItem = {
+  id: string;
+  href: string | null;
+  status: "completed" | "scheduled";
+  phase: string | null;
+  playedAt: string | null;
+  createdAt: string;
+  player1: MatchWithPlayers["player1"];
+  player2: MatchWithPlayers["player2"];
+  player1_id: string;
+  player2_id: string;
+  winner_id: string | null;
+  set1_p1: number | null;
+  set1_p2: number | null;
+  set2_p1: number | null;
+  set2_p2: number | null;
+  set3_p1: number | null;
+  set3_p2: number | null;
+};
+
+type EloResultMatch = EloMatchWithPlayers & {
+  source_match?: { id: string; phase: string } | null;
+};
 
 export function meta() {
   return [
@@ -28,7 +56,29 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("id, name")
     .order("name", { ascending: true });
 
-  let query = supabase
+  const shouldLoadCompleted = status === "all" || status === "completed";
+  const shouldLoadScheduled = status === "all" || status === "scheduled";
+
+  let completedQuery = supabase
+    .from("elo_matches")
+    .select(
+      `
+      *,
+      player1:players!elo_matches_player1_id_fkey(*),
+      player2:players!elo_matches_player2_id_fkey(*),
+      source_match:edition_matches!elo_matches_source_match_id_fkey(id, phase)
+    `,
+    )
+    .order("played_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (playerId !== "all") {
+    completedQuery = completedQuery.or(
+      `player1_id.eq.${playerId},player2_id.eq.${playerId}`,
+    );
+  }
+
+  let scheduledQuery = supabase
     .from("edition_matches")
     .select(
       `
@@ -37,39 +87,92 @@ export async function loader({ request }: Route.LoaderArgs) {
       player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
+    .eq("status", "scheduled")
     .order("created_at", { ascending: false });
 
-  if (status !== "all") {
-    query = query.eq("status", status);
-  }
-
   if (phase !== "all") {
-    query = query.eq("phase", phase);
+    scheduledQuery = scheduledQuery.eq("phase", phase);
   }
 
   if (playerId !== "all") {
-    query = query.or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`);
+    scheduledQuery = scheduledQuery.or(
+      `player1_id.eq.${playerId},player2_id.eq.${playerId}`,
+    );
   }
 
-  const { data: matches } = await query;
+  const [{ data: completedMatches }, { data: scheduledMatches }] =
+    await Promise.all([
+      shouldLoadCompleted ? completedQuery : Promise.resolve({ data: [] }),
+      shouldLoadScheduled ? scheduledQuery : Promise.resolve({ data: [] }),
+    ]);
+
+  const completedResults = ((completedMatches as EloResultMatch[]) || [])
+    .filter((match) => phase === "all" || match.source_match?.phase === phase)
+    .map<ResultItem>((match) => ({
+      id: match.id,
+      href: match.source_match_id ? `/match/${match.source_match_id}` : null,
+      status: "completed",
+      phase: match.source_match?.phase || null,
+      playedAt: match.played_at,
+      createdAt: match.created_at,
+      player1: match.player1,
+      player2: match.player2,
+      player1_id: match.player1_id,
+      player2_id: match.player2_id,
+      winner_id: match.winner_id,
+      set1_p1: match.set1_p1,
+      set1_p2: match.set1_p2,
+      set2_p1: match.set2_p1,
+      set2_p2: match.set2_p2,
+      set3_p1: match.set3_p1,
+      set3_p2: match.set3_p2,
+    }));
+
+  const scheduledResults = (
+    (scheduledMatches as MatchWithPlayers[]) || []
+  ).map<ResultItem>((match) => ({
+    id: match.id,
+    href: `/match/${match.id}`,
+    status: "scheduled",
+    phase: match.phase,
+    playedAt: null,
+    createdAt: match.created_at,
+    player1: match.player1,
+    player2: match.player2,
+    player1_id: match.player1_id,
+    player2_id: match.player2_id,
+    winner_id: match.winner_id,
+    set1_p1: match.set1_p1,
+    set1_p2: match.set1_p2,
+    set2_p1: match.set2_p1,
+    set2_p2: match.set2_p2,
+    set3_p1: match.set3_p1,
+    set3_p2: match.set3_p2,
+  }));
+
+  const results = [...completedResults, ...scheduledResults].sort((a, b) => {
+    const aDate = a.playedAt || a.createdAt;
+    const bDate = b.playedAt || b.createdAt;
+    return new Date(bDate).getTime() - new Date(aDate).getTime();
+  });
 
   return {
-    matches: (matches as MatchWithPlayers[]) || [],
+    results,
+    completedCount: completedResults.length,
+    scheduledCount: scheduledResults.length,
     players: players || [],
   };
 }
 
 export default function Results() {
-  const { matches, players } = useLoaderData<typeof loader>();
+  const { results, completedCount, scheduledCount, players } =
+    useLoaderData<typeof loader>();
   const { user } = useOutletContext<{ user: AppUser | null }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const currentStatus = searchParams.get("status") || "all";
   const currentPhase = searchParams.get("phase") || "all";
   const currentPlayer = searchParams.get("player") || "all";
-
-  const completedMatches = matches.filter((m) => m.status === "completed");
-  const scheduledMatches = matches.filter((m) => m.status === "scheduled");
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
@@ -88,8 +191,7 @@ export default function Results() {
       <div className="page-header">
         <h1>Results</h1>
         <p>
-          {completedMatches.length} completed, {scheduledMatches.length}{" "}
-          remaining
+          {completedCount} completed, {scheduledCount} remaining
         </p>
       </div>
 
@@ -146,58 +248,12 @@ export default function Results() {
         </div>
       </div>
 
-      {matches.length === 0 ? (
+      {results.length === 0 ? (
         <p className="empty">No matches found.</p>
       ) : (
         <div className="results-list">
-          {matches.map((match) => (
-            <Link
-              key={match.id}
-              to={`/match/${match.id}`}
-              className={`results-card ${match.status}`}
-            >
-              <div className="results-card-main">
-                <div className="results-player">
-                  <span className={`tier-badge tier-${match.player1.tier}`}>
-                    {match.player1.tier}
-                  </span>
-                  <span
-                    className={
-                      match.winner_id === match.player1_id ? "winner" : ""
-                    }
-                  >
-                    {match.player1.name}
-                  </span>
-                </div>
-                <div className="results-vs">
-                  {match.status === "completed" ? (
-                    <span className="results-score">{getSetScore(match)}</span>
-                  ) : (
-                    <span>vs</span>
-                  )}
-                </div>
-                <div className="results-player">
-                  <span
-                    className={
-                      match.winner_id === match.player2_id ? "winner" : ""
-                    }
-                  >
-                    {match.player2.name}
-                  </span>
-                  <span className={`tier-badge tier-${match.player2.tier}`}>
-                    {match.player2.tier}
-                  </span>
-                </div>
-              </div>
-              <div className="results-card-meta">
-                <span className={`phase-badge ${match.phase}`}>
-                  {formatPhase(match.phase)}
-                </span>
-                {match.status === "scheduled" && (
-                  <span className="status-badge scheduled">Results</span>
-                )}
-              </div>
-            </Link>
+          {results.map((match) => (
+            <ResultCard key={match.id} match={match} />
           ))}
         </div>
       )}
@@ -205,7 +261,68 @@ export default function Results() {
   );
 }
 
-function getSetScore(match: MatchWithPlayers): string {
+function ResultCard({ match }: { match: ResultItem }) {
+  const content = (
+    <>
+      <div className="results-card-main">
+        <div className="results-player">
+          <span className={`tier-badge tier-${match.player1.tier}`}>
+            {match.player1.tier}
+          </span>
+          <span
+            className={match.winner_id === match.player1_id ? "winner" : ""}
+          >
+            {match.player1.name}
+          </span>
+        </div>
+        <div className="results-vs">
+          {match.status === "completed" ? (
+            <span className="results-score">{getSetScore(match)}</span>
+          ) : (
+            <span>vs</span>
+          )}
+        </div>
+        <div className="results-player">
+          <span
+            className={match.winner_id === match.player2_id ? "winner" : ""}
+          >
+            {match.player2.name}
+          </span>
+          <span className={`tier-badge tier-${match.player2.tier}`}>
+            {match.player2.tier}
+          </span>
+        </div>
+      </div>
+      <div className="results-card-meta">
+        {match.phase ? (
+          <span className={`phase-badge ${match.phase}`}>
+            {formatPhase(match.phase)}
+          </span>
+        ) : (
+          <span className="phase-badge">Past Match</span>
+        )}
+        <span className="results-date">
+          {formatMatchDate(match.playedAt || match.createdAt)}
+        </span>
+        {match.status === "scheduled" && (
+          <span className="status-badge scheduled">Results</span>
+        )}
+      </div>
+    </>
+  );
+
+  if (match.href) {
+    return (
+      <Link to={match.href} className={`results-card ${match.status}`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={`results-card ${match.status}`}>{content}</div>;
+}
+
+function getSetScore(match: ResultItem): string {
   let p1Sets = 0;
   let p2Sets = 0;
 
@@ -223,6 +340,14 @@ function getSetScore(match: MatchWithPlayers): string {
   }
 
   return `${p1Sets} - ${p2Sets}`;
+}
+
+function formatMatchDate(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function formatPhase(phase: string): string {
