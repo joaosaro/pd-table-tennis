@@ -49,7 +49,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Match not found", { status: 404 });
   }
 
-  const { data: players } = await supabase.from("players").select("id");
+  const { data: players } = await supabase
+    .from("players")
+    .select("id")
+    .eq("disabled", false);
   const { count: completedLeagueMatches } = await supabase
     .from("edition_matches")
     .select("*", { count: "exact", head: true })
@@ -119,7 +122,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: "Match not found" };
   }
 
-  const { data: players } = await supabase.from("players").select("id");
+  const { data: players } = await supabase
+    .from("players")
+    .select("id")
+    .eq("disabled", false);
   const { count: completedLeagueMatches } = await supabase
     .from("edition_matches")
     .select("*", { count: "exact", head: true })
@@ -182,7 +188,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     );
 
     // Get standings for seeding
-    const { data: players } = await supabase.from("players").select("*");
+    const { data: players } = await supabase
+      .from("players")
+      .select("*")
+      .eq("disabled", false);
     const { data: leagueMatches } = await supabase
       .from("edition_matches")
       .select(

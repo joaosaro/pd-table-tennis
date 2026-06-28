@@ -25,7 +25,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { supabase } = createSupabaseServerClient(request);
 
-  const { data: players } = await supabase.from("players").select("*");
+  const { data: players } = await supabase
+    .from("players")
+    .select("*")
+    .eq("disabled", false);
 
   const { count: knockoutMatchCount } = await supabase
     .from("edition_matches")
@@ -101,7 +104,10 @@ export async function action({ request }: Route.ActionArgs) {
       };
     }
 
-    const { data: players } = await supabase.from("players").select("*");
+    const { data: players } = await supabase
+      .from("players")
+      .select("*")
+      .eq("disabled", false);
 
     const { data: leagueMatches } = await supabase
       .from("edition_matches")
@@ -165,7 +171,10 @@ export async function action({ request }: Route.ActionArgs) {
       };
     }
 
-    const { data: players } = await supabase.from("players").select("*");
+    const { data: players } = await supabase
+      .from("players")
+      .select("*")
+      .eq("disabled", false);
 
     const { data: leagueMatches } = await supabase
       .from("edition_matches")

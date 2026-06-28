@@ -31,6 +31,7 @@ export interface Player {
   department: string | null;
   slack_handle: string | null;
   tier: 1 | 2 | 3 | 4;
+  disabled: boolean;
   disqualified_from_qualification: boolean;
   disqualification_note: string | null;
   created_at: string;

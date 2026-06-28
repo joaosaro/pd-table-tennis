@@ -38,10 +38,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   // Get all players
-  const { data: players } = await supabase
-    .from("players")
-    .select("*")
-    .order("name");
+  let playersQuery = supabase.from("players").select("*").order("name");
+  if (edition.status === "active") {
+    playersQuery = playersQuery.eq("disabled", false);
+  }
+  const { data: players } = await playersQuery;
 
   // Get all completed league matches
   const { data: matches } = await supabase

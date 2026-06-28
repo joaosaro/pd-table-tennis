@@ -37,7 +37,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   // Get all players
-  const { data: players } = await supabase.from("players").select("*");
+  let playersQuery = supabase.from("players").select("*");
+  if (edition.status === "active") {
+    playersQuery = playersQuery.eq("disabled", false);
+  }
+  const { data: players } = await playersQuery;
 
   // Get all league matches to calculate standings
   const { data: leagueMatches } = await supabase

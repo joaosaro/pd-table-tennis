@@ -38,7 +38,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
-  const { data: players } = await supabase.from("players").select("id");
+  const { data: players } = await supabase
+    .from("players")
+    .select("id")
+    .eq("disabled", false);
   const { count: completedLeagueMatches } = await supabase
     .from("edition_matches")
     .select("*", { count: "exact", head: true })

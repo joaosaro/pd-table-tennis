@@ -27,6 +27,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: players } = await supabase
     .from("players")
     .select("*")
+    .eq("disabled", false)
     .order("name");
 
   const { data: completedMatches } = await supabase
@@ -80,7 +81,10 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: "Please select two different players" };
   }
 
-  const { data: players } = await supabase.from("players").select("id");
+  const { data: players } = await supabase
+    .from("players")
+    .select("id")
+    .eq("disabled", false);
   const { count: completedLeagueMatches } = await supabase
     .from("edition_matches")
     .select("*", { count: "exact", head: true })

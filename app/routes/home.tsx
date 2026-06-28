@@ -36,6 +36,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: players } = await supabase
     .from("players")
     .select("*")
+    .eq("disabled", false)
     .order("name");
 
   // Get all completed league matches for standings

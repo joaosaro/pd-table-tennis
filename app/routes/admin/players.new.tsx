@@ -23,6 +23,7 @@ export async function action({ request }: Route.ActionArgs) {
   const slackHandleRaw = (formData.get("slack_handle") as string) || "";
   const slack_handle = normalizeSlackHandle(slackHandleRaw);
   const tier = parseInt(formData.get("tier") as string) || 4;
+  const disabled = formData.get("disabled") === "on";
 
   if (!name) {
     return { error: "Name is required" };
@@ -33,6 +34,7 @@ export async function action({ request }: Route.ActionArgs) {
     department,
     slack_handle,
     tier,
+    disabled,
   });
 
   if (error) {
@@ -115,6 +117,18 @@ export default function AdminPlayersNew() {
             <option value="3">Tier 3 (2 pts)</option>
             <option value="4">Tier 4 (Easiest - 1 pt)</option>
           </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="disabled">
+            <input
+              type="checkbox"
+              id="disabled"
+              name="disabled"
+              disabled={isSubmitting}
+            />{" "}
+            Disabled (left Pipedrive)
+          </label>
         </div>
 
         <div className="form-actions">
