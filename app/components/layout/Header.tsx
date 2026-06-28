@@ -21,17 +21,14 @@ export function Header({ user }: HeaderProps) {
           <Link to="/leaderboard" className="nav-link">
             Leaderboard
           </Link>
-          <Link to="/standings" className="nav-link">
-            Standings
-          </Link>
           <Link to="/results" className="nav-link">
             Results
           </Link>
+          <Link to="/archive" className="nav-link">
+            Archive
+          </Link>
           <Link to="/players" className="nav-link">
             Players
-          </Link>
-          <Link to="/bracket" className="nav-link">
-            Bracket
           </Link>
         </nav>
 

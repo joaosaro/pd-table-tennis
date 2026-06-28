@@ -1,4 +1,9 @@
-import { Link, useLoaderData } from "react-router";
+import { Link, redirect, useLoaderData } from "react-router";
+import {
+  formatEditionLabel,
+  getActiveEdition,
+  getEditionForRequest,
+} from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
@@ -16,6 +21,20 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
+  const url = new URL(request.url);
+  const requestedEditionId = url.searchParams.get("edition");
+  const edition = await getEditionForRequest(supabase, requestedEditionId);
+
+  if (!edition) {
+    throw new Response("Edition not found", { status: 404 });
+  }
+
+  if (!requestedEditionId) {
+    const activeEdition = await getActiveEdition(supabase);
+    if (!activeEdition) {
+      throw redirect("/archive");
+    }
+  }
 
   // Get all players
   const { data: players } = await supabase.from("players").select("*");
@@ -30,6 +49,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
+    .eq("edition_id", edition.id)
     .eq("phase", "league")
     .eq("status", "completed");
 
@@ -37,6 +57,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { count: incompleteLeagueCount } = await supabase
     .from("edition_matches")
     .select("*", { count: "exact", head: true })
+    .eq("edition_id", edition.id)
     .eq("phase", "league")
     .eq("status", "scheduled");
 
@@ -50,6 +71,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
+    .eq("edition_id", edition.id)
     .neq("phase", "league");
 
   const standings = calculateStandings(
@@ -60,6 +82,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     standings,
+    edition,
     qualification,
     knockoutMatches: (knockoutMatches as MatchWithPlayers[]) || [],
     leagueInProgress: (incompleteLeagueCount ?? 0) > 0,
@@ -67,7 +90,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Bracket() {
-  const { standings, qualification, knockoutMatches, leagueInProgress } =
+  const { standings, edition, qualification, knockoutMatches, leagueInProgress } =
     useLoaderData<typeof loader>();
 
   // Get qualified players (top 10)
@@ -117,6 +140,12 @@ export default function Bracket() {
           Top 2 from league go directly to semifinals. 3rd-10th play knockout
           rounds.
         </p>
+        <div className="edition-context-links">
+          <span className="edition-context-label">
+            {formatEditionLabel(edition)}
+          </span>
+          <Link to="/archive">Archive</Link>
+        </div>
       </div>
 
       {leagueInProgress && (

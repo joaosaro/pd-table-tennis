@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import { Link, useLoaderData } from "react-router";
+import { Link, redirect, useLoaderData } from "react-router";
+import {
+  formatEditionLabel,
+  getActiveEdition,
+  getEditionForRequest,
+} from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
@@ -17,6 +22,20 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
+  const url = new URL(request.url);
+  const requestedEditionId = url.searchParams.get("edition");
+  const edition = await getEditionForRequest(supabase, requestedEditionId);
+
+  if (!edition) {
+    throw new Response("Edition not found", { status: 404 });
+  }
+
+  if (!requestedEditionId) {
+    const activeEdition = await getActiveEdition(supabase);
+    if (!activeEdition) {
+      throw redirect("/archive");
+    }
+  }
 
   // Get all players
   const { data: players } = await supabase
@@ -34,6 +53,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
+    .eq("edition_id", edition.id)
     .eq("phase", "league")
     .eq("status", "completed");
 
@@ -52,11 +72,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     ),
   ].sort();
 
-  return { standings, departments, qualification };
+  return { standings, departments, qualification, edition };
 }
 
 export default function Standings() {
-  const { standings, departments, qualification } =
+  const { standings, departments, qualification, edition } =
     useLoaderData<typeof loader>();
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
 
@@ -70,6 +90,12 @@ export default function Standings() {
       <div className="page-header">
         <h1>League Standings</h1>
         <p>Top 10 qualify for playoffs. 1st and 2nd get byes to semifinals.</p>
+        <div className="edition-context-links">
+          <span className="edition-context-label">
+            {formatEditionLabel(edition)}
+          </span>
+          <Link to="/archive">Archive</Link>
+        </div>
       </div>
 
       {departments.length > 0 && (

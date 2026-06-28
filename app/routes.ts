@@ -4,13 +4,13 @@ export default [
   // Public routes
   index("routes/home.tsx"),
   route("leaderboard", "routes/leaderboard.tsx"),
+  route("archive", "routes/archive.tsx"),
   route("standings", "routes/standings.tsx"),
   route("results", "routes/results.tsx"),
   route("players", "routes/players.tsx"),
   route("player/:id", "routes/player.$id.tsx"),
   route("match/:id", "routes/match.$id.tsx"),
   route("bracket", "routes/bracket.tsx"),
-  route("recommendations", "routes/recommendations.tsx"),
 
   // Auth routes
   route("login", "routes/auth/login.tsx"),
@@ -33,5 +33,4 @@ export default [
   route("admin/settings", "routes/admin/settings.tsx"),
   route("admin/users", "routes/admin/users.tsx"),
   route("admin/export-results", "routes/admin/export-results.tsx"),
-  route("admin/recommendations", "routes/admin/recommendations.tsx"),
 ] satisfies RouteConfig;

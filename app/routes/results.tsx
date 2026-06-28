@@ -4,6 +4,10 @@ import {
   useOutletContext,
   useSearchParams,
 } from "react-router";
+import {
+  formatEditionLabel,
+  getEditionForRequest,
+} from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type {
   AppUser,
@@ -33,7 +37,7 @@ type ResultItem = {
 };
 
 type EloResultMatch = EloMatchWithPlayers & {
-  source_match?: { id: string; phase: string } | null;
+  source_match?: { id: string; phase: string; edition_id: string } | null;
 };
 
 export function meta() {
@@ -46,9 +50,17 @@ export function meta() {
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const url = new URL(request.url);
+  const edition = await getEditionForRequest(
+    supabase,
+    url.searchParams.get("edition"),
+  );
   const status = url.searchParams.get("status") || "all";
   const phase = url.searchParams.get("phase") || "all";
   const playerId = url.searchParams.get("player") || "all";
+
+  if (!edition) {
+    throw new Response("Edition not found", { status: 404 });
+  }
 
   // Fetch all players for the filter dropdown
   const { data: players } = await supabase
@@ -66,7 +78,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       *,
       player1:players!elo_matches_player1_id_fkey(*),
       player2:players!elo_matches_player2_id_fkey(*),
-      source_match:edition_matches!elo_matches_source_match_id_fkey(id, phase)
+      source_match:edition_matches!elo_matches_source_match_id_fkey(id, phase, edition_id)
     `,
     )
     .order("played_at", { ascending: false })
@@ -87,6 +99,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
+    .eq("edition_id", edition.id)
     .eq("status", "scheduled")
     .order("created_at", { ascending: false });
 
@@ -107,7 +120,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     ]);
 
   const completedResults = ((completedMatches as EloResultMatch[]) || [])
-    .filter((match) => phase === "all" || match.source_match?.phase === phase)
+    .filter(
+      (match) =>
+        match.source_match?.edition_id === edition.id &&
+        (phase === "all" || match.source_match?.phase === phase),
+    )
     .map<ResultItem>((match) => ({
       id: match.id,
       href: match.source_match_id ? `/match/${match.source_match_id}` : null,
@@ -157,6 +174,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   });
 
   return {
+    edition,
     results,
     completedCount: completedResults.length,
     scheduledCount: scheduledResults.length,
@@ -165,7 +183,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Results() {
-  const { results, completedCount, scheduledCount, players } =
+  const { edition, results, completedCount, scheduledCount, players } =
     useLoaderData<typeof loader>();
   const { user } = useOutletContext<{ user: AppUser | null }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -193,6 +211,15 @@ export default function Results() {
         <p>
           {completedCount} completed, {scheduledCount} remaining
         </p>
+        <div className="edition-context-links">
+          <span className="edition-context-label">
+            {formatEditionLabel(edition)}
+          </span>
+          <Link to="/archive">Archive</Link>
+          {edition.status === "archived" ? (
+            <Link to="/results">Current results</Link>
+          ) : null}
+        </div>
       </div>
 
       {canEdit && (
