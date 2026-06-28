@@ -4,6 +4,8 @@ export default [
   // Public routes
   index("routes/home.tsx"),
   route("leaderboard", "routes/leaderboard.tsx"),
+  route("elo", "routes/elo.tsx"),
+  route("elo/dry-run", "routes/elo.dry-run.tsx"),
   route("archive", "routes/archive.tsx"),
   route("standings", "routes/standings.tsx"),
   route("results", "routes/results.tsx"),

@@ -118,10 +118,49 @@ export interface EloStanding {
   player: Player;
   rank: number;
   rating: number;
+  rawRating: number;
+  initialRating: number;
   matchesPlayed: number;
   wins: number;
   losses: number;
   lastPlayedAt: string | null;
+}
+
+export interface PlayerEloRating {
+  player_id: string;
+  current_rating: number;
+  initial_rating: number;
+  rated_games: number;
+  wins: number;
+  losses: number;
+  last_match_id: string | null;
+  last_played_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EloRatingHistoryEntry {
+  id: string;
+  match_id: string;
+  season: number;
+  player_id: string;
+  opponent_id: string;
+  played_at: string;
+  result_score: number;
+  expected_score: number;
+  k_factor: number;
+  rated_games_before: number;
+  rated_games_after: number;
+  rating_before: number;
+  rating_after: number;
+  rating_change: number;
+  created_at: string;
+}
+
+export interface EloRatingHistoryEntryWithPlayers extends EloRatingHistoryEntry {
+  player?: Player | null;
+  opponent?: Player | null;
+  match?: MatchWithPlayers | null;
 }
 
 // App user (simplified for UI)

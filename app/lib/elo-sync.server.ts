@@ -1,70 +1,70 @@
-import type { Match } from "./types";
+import { buildEloRatings } from "./elo.server";
+import type { Match, Player } from "./types";
 
 type SupabaseClientLike = {
   from: (table: string) => any;
 };
 
-export async function syncEditionMatchToElo(
-  supabase: SupabaseClientLike,
-  match: Pick<
-    Match,
-    | "id"
-    | "season"
-    | "player1_id"
-    | "player2_id"
-    | "winner_id"
-    | "status"
-    | "set1_p1"
-    | "set1_p2"
-    | "set2_p1"
-    | "set2_p2"
-    | "set3_p1"
-    | "set3_p2"
-    | "recorded_by"
-    | "recorded_at"
-    | "created_at"
-  >,
-) {
-  if (match.status !== "completed" || !match.winner_id) {
-    await supabase
-      .from("elo_matches")
-      .delete()
-      .eq("source_type", "edition_match")
-      .eq("source_match_id", match.id);
-    return;
+export async function rebuildEloRatings(supabase: SupabaseClientLike) {
+  const [
+    { data: players, error: playersError },
+    { data: matches, error: matchesError },
+  ] = await Promise.all([
+    supabase.from("players").select("*").order("name"),
+    supabase
+      .from("edition_matches")
+      .select(
+        "id, season, player1_id, player2_id, winner_id, recorded_at, created_at",
+      )
+      .eq("status", "completed"),
+  ]);
+
+  if (playersError) {
+    throw new Error(playersError.message);
   }
 
-  const eloPayload = {
-    source_type: "edition_match",
-    source_match_id: match.id,
-    season: match.season,
-    player1_id: match.player1_id,
-    player2_id: match.player2_id,
-    winner_id: match.winner_id,
-    played_at: match.recorded_at || match.created_at,
-    set1_p1: match.set1_p1,
-    set1_p2: match.set1_p2,
-    set2_p1: match.set2_p1,
-    set2_p2: match.set2_p2,
-    set3_p1: match.set3_p1,
-    set3_p2: match.set3_p2,
-    recorded_by: match.recorded_by,
-  };
-
-  const { data: existingEloMatch } = await supabase
-    .from("elo_matches")
-    .select("id")
-    .eq("source_type", "edition_match")
-    .eq("source_match_id", match.id)
-    .maybeSingle();
-
-  if (existingEloMatch) {
-    await supabase
-      .from("elo_matches")
-      .update(eloPayload)
-      .eq("id", existingEloMatch.id);
-    return;
+  if (matchesError) {
+    throw new Error(matchesError.message);
   }
 
-  await supabase.from("elo_matches").insert(eloPayload);
+  const { historyRows, playerRatings } = buildEloRatings(
+    (players as Player[]) || [],
+    (matches as Match[]) || [],
+  );
+
+  const { error: deleteHistoryError } = await supabase
+    .from("elo_rating_history")
+    .delete()
+    .gte("season", 1);
+
+  if (deleteHistoryError) {
+    throw new Error(deleteHistoryError.message);
+  }
+
+  const { error: deleteRatingsError } = await supabase
+    .from("player_elo_ratings")
+    .delete()
+    .gte("rated_games", 0);
+
+  if (deleteRatingsError) {
+    throw new Error(deleteRatingsError.message);
+  }
+
+  if (historyRows.length > 0) {
+    const { error: insertHistoryError } = await supabase
+      .from("elo_rating_history")
+      .insert(historyRows);
+
+    if (insertHistoryError) {
+      throw new Error(insertHistoryError.message);
+    }
+  }
+
+  const { error: upsertRatingsError } = await supabase
+    .from("player_elo_ratings")
+    .upsert(playerRatings, { onConflict: "player_id" });
+
+  if (upsertRatingsError) {
+    throw new Error(upsertRatingsError.message);
+  }
 }

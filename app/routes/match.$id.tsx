@@ -1,9 +1,13 @@
 import { Link, useLoaderData } from "react-router";
 import { getUser } from "~/lib/auth.server";
-import type { EditionStatus } from "~/lib/types";
+import { getDisplayRating } from "~/lib/elo";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { getLeagueProgress } from "~/lib/tournament.server";
-import type { MatchWithPlayers } from "~/lib/types";
+import type {
+  EditionStatus,
+  EloRatingHistoryEntry,
+  MatchWithPlayers,
+} from "~/lib/types";
 import { TIER_POINTS } from "~/lib/types";
 import type { Route } from "./+types/match.$id";
 
@@ -29,7 +33,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       *,
       player1:players!edition_matches_player1_id_fkey(*),
       player2:players!edition_matches_player2_id_fkey(*)
-    `
+    `,
     )
     .eq("id", params.id)
     .single();
@@ -57,22 +61,28 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const leagueProgress = getLeagueProgress(
     players?.length || 0,
-    completedLeagueMatches || 0
+    completedLeagueMatches || 0,
   );
   const canSubmitResult =
     canEdit &&
     (!leagueProgress.isFinished ||
       (match.phase !== "league" && match.status === "scheduled"));
 
+  const { data: eloEntries } = await supabase
+    .from("elo_rating_history")
+    .select("*")
+    .eq("match_id", match.id);
+
   return {
     match: match as MatchWithPlayers,
     canSubmitResult,
     editionStatus: (edition?.status as EditionStatus | undefined) ?? "active",
+    eloEntries: (eloEntries as EloRatingHistoryEntry[]) || [],
   };
 }
 
 export default function MatchDetails() {
-  const { match, canSubmitResult, editionStatus } =
+  const { match, canSubmitResult, editionStatus, eloEntries } =
     useLoaderData<typeof loader>();
   const showArchivedLeagueTier =
     editionStatus === "archived" && match.phase === "league";
@@ -92,6 +102,12 @@ export default function MatchDetails() {
     match.winner_id === match.player1_id ? match.player2 : match.player1;
   const pointsEarned =
     match.status === "completed" ? TIER_POINTS[loser.tier as 1 | 2 | 3 | 4] : 0;
+  const player1Elo = eloEntries.find(
+    (entry) => entry.player_id === match.player1_id,
+  );
+  const player2Elo = eloEntries.find(
+    (entry) => entry.player_id === match.player2_id,
+  );
 
   return (
     <main className="page">
@@ -104,10 +120,7 @@ export default function MatchDetails() {
             <span className="status-badge scheduled">Scheduled</span>
           )}
           {canSubmitResult && (
-            <Link
-              to={`/editor/record/${match.id}`}
-              className="btn btn-primary"
-            >
+            <Link to={`/editor/record/${match.id}`} className="btn btn-primary">
               {match.status === "scheduled" ? "Record Result" : "Edit Result"}
             </Link>
           )}
@@ -214,6 +227,18 @@ export default function MatchDetails() {
           </div>
         )}
 
+        {match.status === "completed" && player1Elo && player2Elo ? (
+          <div className="match-summary">
+            <p>
+              Elo: {match.player1.name}{" "}
+              {formatRatingChange(player1Elo.rating_change)} to{" "}
+              {getDisplayRating(player1Elo.rating_after)} • {match.player2.name}{" "}
+              {formatRatingChange(player2Elo.rating_change)} to{" "}
+              {getDisplayRating(player2Elo.rating_after)}
+            </p>
+          </div>
+        ) : null}
+
         {match.recorded_at && (
           <div className="match-recorded">
             Recorded {new Date(match.recorded_at).toLocaleDateString()}
@@ -222,6 +247,11 @@ export default function MatchDetails() {
       </div>
     </main>
   );
+}
+
+function formatRatingChange(change: number) {
+  const rounded = Math.round(change);
+  return rounded > 0 ? `+${rounded}` : `${rounded}`;
 }
 
 function formatPhase(phase: string): string {

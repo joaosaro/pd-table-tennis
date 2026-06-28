@@ -1,7 +1,14 @@
-import { Form, redirect, useActionData, useNavigation, data } from "react-router";
-import type { Route } from "./+types/players.new";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import {
+  data,
+  Form,
+  redirect,
+  useActionData,
+  useNavigation,
+} from "react-router";
 import { requireRole } from "~/lib/auth.server";
+import { rebuildEloRatings } from "~/lib/elo-sync.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
+import type { Route } from "./+types/players.new";
 
 export function meta() {
   return [{ title: "Add Player | PD Table Tennis" }];
@@ -39,6 +46,8 @@ export async function action({ request }: Route.ActionArgs) {
   if (error) {
     return { error: error.message };
   }
+
+  await rebuildEloRatings(supabase);
 
   const allHeaders = new Headers(authHeaders);
   headers.forEach((value, key) => allHeaders.append(key, value));

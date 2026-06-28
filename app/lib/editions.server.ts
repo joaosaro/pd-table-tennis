@@ -33,6 +33,17 @@ export async function getLatestEdition(
   return (latestEdition as Edition | null) || null;
 }
 
+export async function listEditions(
+  supabase: SupabaseClient,
+): Promise<Edition[]> {
+  const { data: editions } = await supabase
+    .from("editions")
+    .select("*")
+    .order("season", { ascending: false });
+
+  return (editions as Edition[]) || [];
+}
+
 export async function getEditionForRequest(
   supabase: SupabaseClient,
   editionId: string | null,

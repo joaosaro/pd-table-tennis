@@ -1,7 +1,7 @@
 import { Link, useLoaderData } from "react-router";
-import { calculateEloStandings } from "~/lib/elo.server";
+import { buildLeaderboardFromStoredRatings } from "~/lib/elo";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { EloMatchWithPlayers, Player } from "~/lib/types";
+import type { Player, PlayerEloRating } from "~/lib/types";
 import type { Route } from "./+types/leaderboard";
 
 export function meta() {
@@ -20,27 +20,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     .eq("disabled", false)
     .order("name");
 
-  const { data: matches } = await supabase
-    .from("elo_matches")
-    .select(
-      `
-      *,
-      player1:players!elo_matches_player1_id_fkey(*),
-      player2:players!elo_matches_player2_id_fkey(*),
-      winner:players!elo_matches_winner_id_fkey(*)
-    `,
-    )
-    .order("played_at", { ascending: true })
-    .order("created_at", { ascending: true });
+  const { data: ratings } = await supabase
+    .from("player_elo_ratings")
+    .select("*");
 
-  const leaderboard = calculateEloStandings(
+  const leaderboard = buildLeaderboardFromStoredRatings(
     (players as Player[]) || [],
-    (matches as EloMatchWithPlayers[]) || [],
+    (ratings as PlayerEloRating[]) || [],
   );
 
   return {
     leaderboard,
-    matchCount: matches?.length || 0,
+    matchCount:
+      leaderboard.reduce((count, player) => count + player.matchesPlayed, 0) /
+      2,
   };
 }
 
@@ -52,6 +45,12 @@ export default function Leaderboard() {
       <div className="page-header">
         <h1>ELO Leaderboard</h1>
         <p>{matchCount} rated matches</p>
+        <Link to="/elo" className="view-all-link">
+          How it works
+        </Link>
+        <Link to="/elo/dry-run" className="view-all-link">
+          Dry run
+        </Link>
       </div>
 
       {leaderboard.length === 0 ? (
@@ -84,9 +83,7 @@ export default function Leaderboard() {
                       {standing.player.name}
                     </Link>
                   </td>
-                  <td className="text-right points-cell">
-                    {standing.rating}
-                  </td>
+                  <td className="text-right points-cell">{standing.rating}</td>
                   <td className="text-center">{standing.matchesPlayed}</td>
                   <td className="text-center">{standing.wins}</td>
                   <td className="text-center">{standing.losses}</td>
