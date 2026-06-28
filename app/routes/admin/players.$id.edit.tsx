@@ -40,12 +40,17 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
+  const { data: existingPlayer } = await supabase
+    .from("players")
+    .select("tier")
+    .eq("id", params.id)
+    .single();
 
   const name = (formData.get("name") as string)?.trim();
   const department = (formData.get("department") as string)?.trim() || null;
   const slackHandleRaw = (formData.get("slack_handle") as string) || "";
   const slack_handle = normalizeSlackHandle(slackHandleRaw);
-  const tier = parseInt(formData.get("tier") as string) || 4;
+  const tier = existingPlayer?.tier ?? 4;
   const disabled = formData.get("disabled") === "on";
   const disqualifiedFromQualification =
     formData.get("disqualified_from_qualification") === "on";
@@ -143,24 +148,6 @@ export default function AdminPlayersEdit() {
             placeholder="e.g. joaosaro"
             disabled={isSubmitting}
           />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="tier" className="form-label">
-            Tier
-          </label>
-          <select
-            id="tier"
-            name="tier"
-            className="form-select"
-            defaultValue={player.tier}
-            disabled={isSubmitting}
-          >
-            <option value="1">Tier 1 (Hardest - 4 pts)</option>
-            <option value="2">Tier 2 (3 pts)</option>
-            <option value="3">Tier 3 (2 pts)</option>
-            <option value="4">Tier 4 (Easiest - 1 pt)</option>
-          </select>
         </div>
 
         <div className="form-group">
