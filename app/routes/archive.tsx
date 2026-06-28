@@ -1,37 +1,9 @@
 import { Link, useLoaderData } from "react-router";
 import { formatEditionLabel } from "~/lib/editions";
 import { listArchivedEditionSummaries } from "~/lib/editions.server";
+import { legacyArchiveEntries } from "~/lib/legacy-archive";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type { Route } from "./+types/archive";
-
-const legacyArchiveEntries = [
-  {
-    id: "legacy-i-lisbon-pd-open",
-    season: 1,
-    name: "I Lisbon PD Open",
-    championName: "Felipe Ortiz",
-    archivedLabel: "Archived on Challonge",
-    links: [
-      {
-        label: "Bracket",
-        href: "https://challonge.com/i_lisbon_pd_open",
-      },
-    ],
-  },
-  {
-    id: "legacy-ii-league",
-    season: 2,
-    name: "II League",
-    championName: "Felipe Ortiz",
-    archivedLabel: "Archived on Challonge",
-    links: [
-      {
-        label: "Bracket",
-        href: "https://challonge.com/lwjtiang",
-      },
-    ],
-  },
-] as const;
 
 export function meta() {
   return [
@@ -66,7 +38,7 @@ export default function Archive() {
       {!hasArchiveEntries ? (
         <p className="empty">No archived sessions yet.</p>
       ) : (
-        <div className="archive-grid">
+        <div className="archive-grid archive-grid--stacked">
           {editions.map((edition) => (
             <article key={edition.id} className="archive-card">
               <div className="archive-card-header">

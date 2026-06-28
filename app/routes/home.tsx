@@ -4,6 +4,7 @@ import {
   getActiveEdition,
   listArchivedEditionSummaries,
 } from "~/lib/editions.server";
+import { legacyArchiveEntries } from "~/lib/legacy-archive";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
@@ -133,6 +134,7 @@ export default function Home() {
   } = useLoaderData<typeof loader>();
   const { user } = useOutletContext<{ user: AppUser | null }>();
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  const archivePreviewEntries = [...archivedEditions, ...legacyArchiveEntries];
 
   return (
     <main className="home-page">
@@ -265,7 +267,7 @@ export default function Home() {
         )}
       </section>
 
-      {archivedEditions.length > 0 && (
+      {archivePreviewEntries.length > 0 && (
         <section className="archive-preview">
           <div className="column-header">
             <h2>Previous Sessions</h2>
@@ -293,6 +295,32 @@ export default function Home() {
                 <div className="archive-card-links">
                   <Link to={`/standings?edition=${edition.id}`}>Standings</Link>
                   <Link to={`/bracket?edition=${edition.id}`}>Bracket</Link>
+                </div>
+              </article>
+            ))}
+            {legacyArchiveEntries.map((edition) => (
+              <article key={edition.id} className="archive-card">
+                <div className="archive-card-header">
+                  <div>
+                    <h3>{formatEditionLabel(edition)}</h3>
+                    <p>{edition.name}</p>
+                  </div>
+                  <span className="archive-champion-badge">Champion</span>
+                </div>
+                <div className="archive-card-body">
+                  <p className="archive-champion-name">{edition.championName}</p>
+                </div>
+                <div className="archive-card-links">
+                  {edition.links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
                 </div>
               </article>
             ))}
