@@ -9,6 +9,7 @@ export async function syncEditionMatchToElo(
   match: Pick<
     Match,
     | "id"
+    | "season"
     | "player1_id"
     | "player2_id"
     | "winner_id"
@@ -36,6 +37,7 @@ export async function syncEditionMatchToElo(
   const eloPayload = {
     source_type: "edition_match",
     source_match_id: match.id,
+    season: match.season,
     player1_id: match.player1_id,
     player2_id: match.player2_id,
     winner_id: match.winner_id,

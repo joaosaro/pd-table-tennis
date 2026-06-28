@@ -16,6 +16,7 @@ export type EloMatchSourceType = "edition_match" | "manual";
 export interface Edition {
   id: string;
   name: string;
+  season: number;
   status: EditionStatus;
   starts_on: string | null;
   ends_on: string | null;
@@ -59,6 +60,7 @@ export interface TournamentSettings {
 export interface Match {
   id: string;
   edition_id: string;
+  season: number;
   player1_id: string;
   player2_id: string;
   phase: MatchPhase;
@@ -88,6 +90,7 @@ export interface EloMatch {
   id: string;
   source_type: EloMatchSourceType;
   source_match_id: string | null;
+  season: number;
   player1_id: string;
   player2_id: string;
   winner_id: string;

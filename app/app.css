@@ -1843,6 +1843,19 @@ body {
 .results-card-meta {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.results-date {
+  font-size: 0.75rem;
+  color: var(--color-gray-600);
+}
+
+@media (prefers-color-scheme: dark) {
+  .results-date {
+    color: var(--color-gray-300);
+  }
 }
 
 .results-card-actions {
