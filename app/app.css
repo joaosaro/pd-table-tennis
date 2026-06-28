@@ -1277,6 +1277,10 @@ body {
   margin-bottom: 1rem;
 }
 
+.alumni-section {
+  margin-top: 2rem;
+}
+
 .tier-heading {
   display: flex;
   align-items: center;
@@ -1322,12 +1326,23 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.player-card-alumni {
+  border-style: dashed;
+}
+
+.player-card-alumni:hover {
+  border-color: var(--color-gray-400);
+}
+
 @media (prefers-color-scheme: dark) {
   .player-card {
     border-color: var(--color-gray-700);
   }
   .player-card:hover {
     border-color: var(--color-blue-500);
+  }
+  .player-card-alumni:hover {
+    border-color: var(--color-gray-500);
   }
 }
 
@@ -1343,6 +1358,10 @@ body {
   font-weight: 600;
   font-size: 1.25rem;
   flex-shrink: 0;
+}
+
+.player-avatar-alumni {
+  background: var(--color-gray-500);
 }
 
 .player-info {
