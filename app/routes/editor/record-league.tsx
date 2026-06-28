@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   data,
   Form,
@@ -6,9 +7,8 @@ import {
   useLoaderData,
   useNavigation,
 } from "react-router";
-import { useState } from "react";
 import { requireRole } from "~/lib/auth.server";
-import { syncEditionMatchToElo } from "~/lib/elo-sync.server";
+import { rebuildEloRatings } from "~/lib/elo-sync.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { getLeagueProgress } from "~/lib/tournament.server";
 import type { Player } from "~/lib/types";
@@ -38,7 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const leagueProgress = getLeagueProgress(
     (players as Player[])?.length || 0,
-    completedMatches?.length || 0
+    completedMatches?.length || 0,
   );
 
   if (leagueProgress.isFinished) {
@@ -57,7 +57,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       players: (players as Player[]) || [],
       playedPairs: Array.from(playedPairs),
     },
-    { headers }
+    { headers },
   );
 }
 
@@ -93,12 +93,13 @@ export async function action({ request }: Route.ActionArgs) {
 
   const leagueProgress = getLeagueProgress(
     players?.length || 0,
-    completedLeagueMatches || 0
+    completedLeagueMatches || 0,
   );
 
   if (leagueProgress.isFinished) {
     return {
-      error: "The league stage is complete. Only open knockout matches can be submitted now.",
+      error:
+        "The league stage is complete. Only open knockout matches can be submitted now.",
     };
   }
 
@@ -108,7 +109,7 @@ export async function action({ request }: Route.ActionArgs) {
     .select("id")
     .eq("phase", "league")
     .or(
-      `and(player1_id.eq.${player1Id},player2_id.eq.${player2Id}),and(player1_id.eq.${player2Id},player2_id.eq.${player1Id})`
+      `and(player1_id.eq.${player1Id},player2_id.eq.${player2Id}),and(player1_id.eq.${player2Id},player2_id.eq.${player1Id})`,
     )
     .single();
 
@@ -176,7 +177,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (createdMatch) {
-    await syncEditionMatchToElo(supabase, createdMatch);
+    await rebuildEloRatings(supabase);
   }
 
   const allHeaders = new Headers(authHeaders);
@@ -260,7 +261,7 @@ export default function RecordLeagueMatch() {
               {availablePlayers2.map((player) => {
                 const ids = [player1Id, player.id].sort();
                 const alreadyPlayed = playedPairs.includes(
-                  `${ids[0]}-${ids[1]}`
+                  `${ids[0]}-${ids[1]}`,
                 );
                 return (
                   <option

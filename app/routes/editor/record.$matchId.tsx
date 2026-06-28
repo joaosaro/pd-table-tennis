@@ -7,12 +7,12 @@ import {
   useNavigation,
 } from "react-router";
 import { requireRole } from "~/lib/auth.server";
-import { syncEditionMatchToElo } from "~/lib/elo-sync.server";
+import { rebuildEloRatings } from "~/lib/elo-sync.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
-  getLeagueProgress,
   getKnockoutRoundUpdates,
+  getLeagueProgress,
 } from "~/lib/tournament.server";
 import type { Match, MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/record.$matchId";
@@ -40,7 +40,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       *,
       player1:players!edition_matches_player1_id_fkey(*),
       player2:players!edition_matches_player2_id_fkey(*)
-    `
+    `,
     )
     .eq("id", params.matchId)
     .single();
@@ -61,7 +61,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const leagueProgress = getLeagueProgress(
     players?.length || 0,
-    completedLeagueMatches || 0
+    completedLeagueMatches || 0,
   );
 
   if (leagueProgress.isFinished && match.phase === "league") {
@@ -134,7 +134,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const leagueProgress = getLeagueProgress(
     players?.length || 0,
-    completedLeagueMatches || 0
+    completedLeagueMatches || 0,
   );
 
   if (leagueProgress.isFinished && match.phase === "league") {
@@ -169,7 +169,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (updatedMatch) {
-    await syncEditionMatchToElo(supabase, updatedMatch);
+    await rebuildEloRatings(supabase);
   }
 
   // Check if this was a knockout match and generate next round if needed
@@ -184,7 +184,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const updatedKnockoutMatches = (knockoutMatches || []).map((m) =>
       m.id === params.matchId
         ? { ...m, status: "completed", winner_id: winnerId }
-        : m
+        : m,
     );
 
     // Get standings for seeding
@@ -199,20 +199,20 @@ export async function action({ request, params }: Route.ActionArgs) {
         *,
         player1:players!edition_matches_player1_id_fkey(*),
         player2:players!edition_matches_player2_id_fkey(*)
-      `
+      `,
       )
       .eq("phase", "league")
       .eq("status", "completed");
 
     const standings = calculateStandings(
       (players as Player[]) || [],
-      (leagueMatches as MatchWithPlayers[]) || []
+      (leagueMatches as MatchWithPlayers[]) || [],
     );
 
     // Check if we need to create or update next round matches
     const roundUpdates = getKnockoutRoundUpdates(
       updatedKnockoutMatches as Match[],
-      standings
+      standings,
     );
 
     // Delete stale scheduled matches first

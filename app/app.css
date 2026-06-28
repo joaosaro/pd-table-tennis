@@ -2968,7 +2968,6 @@ body {
   }
 }
 
-
 .recommendation-players {
   display: flex;
   align-items: center;
@@ -3238,6 +3237,68 @@ body {
   font-weight: 600;
 }
 
+.elo-formula-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 1rem;
+  background: white;
+}
+
+.elo-formula-card p {
+  margin: 0;
+}
+
+.elo-formula-card code {
+  font-size: 0.95em;
+}
+
+.dry-run-summary {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 1.5rem 0;
+}
+
+.dry-run-summary-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 0.5rem;
+  background: white;
+  text-decoration: none;
+}
+
+.dry-run-summary-item span {
+  color: var(--color-gray-500);
+  font-weight: 700;
+}
+
+.dry-run-summary-item em {
+  color: var(--color-green-700);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.dry-run-table-container {
+  overflow-x: auto;
+}
+
+.dry-run-table {
+  min-width: 1040px;
+}
+
+.dry-run-season {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--color-gray-500);
+  font-size: 0.8rem;
+}
+
 @media (prefers-color-scheme: dark) {
   .edition-context-label {
     background: rgba(59, 130, 246, 0.2);
@@ -3255,5 +3316,19 @@ body {
 
   .archive-pending-badge {
     color: #fcd34d;
+  }
+
+  .elo-formula-card {
+    background: var(--color-gray-900);
+    border-color: var(--color-gray-700);
+  }
+
+  .dry-run-summary-item {
+    background: var(--color-gray-900);
+    border-color: var(--color-gray-700);
+  }
+
+  .dry-run-summary-item em {
+    color: #86efac;
   }
 }

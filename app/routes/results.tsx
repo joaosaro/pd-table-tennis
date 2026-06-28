@@ -5,17 +5,9 @@ import {
   useSearchParams,
 } from "react-router";
 import { formatEditionLabel } from "~/lib/editions";
-import {
-  getEditionForRequest,
-  listEditions,
-} from "~/lib/editions.server";
+import { getEditionForRequest, listEditions } from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type {
-  AppUser,
-  Edition,
-  EloMatchWithPlayers,
-  MatchWithPlayers,
-} from "~/lib/types";
+import type { AppUser, Edition, MatchWithPlayers } from "~/lib/types";
 import type { Route } from "./+types/results";
 
 const RESULTS_PER_PAGE = 20;
@@ -38,10 +30,6 @@ type ResultItem = {
   set2_p2: number | null;
   set3_p1: number | null;
   set3_p2: number | null;
-};
-
-type EloResultMatch = EloMatchWithPlayers & {
-  source_match?: { id: string; phase: string; edition_id: string } | null;
 };
 
 export function meta() {
@@ -78,17 +66,22 @@ export async function loader({ request }: Route.LoaderArgs) {
   const shouldLoadScheduled = status === "all" || status === "scheduled";
 
   let completedQuery = supabase
-    .from("elo_matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!elo_matches_player1_id_fkey(*),
-      player2:players!elo_matches_player2_id_fkey(*),
-      source_match:edition_matches!elo_matches_source_match_id_fkey(id, phase, edition_id)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
-    .order("played_at", { ascending: false })
+    .eq("edition_id", edition.id)
+    .eq("status", "completed")
+    .order("recorded_at", { ascending: false })
     .order("created_at", { ascending: false });
+
+  if (phase !== "all") {
+    completedQuery = completedQuery.eq("phase", phase);
+  }
 
   if (playerId !== "all") {
     completedQuery = completedQuery.or(
@@ -125,31 +118,27 @@ export async function loader({ request }: Route.LoaderArgs) {
       shouldLoadScheduled ? scheduledQuery : Promise.resolve({ data: [] }),
     ]);
 
-  const completedResults = ((completedMatches as EloResultMatch[]) || [])
-    .filter(
-      (match) =>
-        match.source_match?.edition_id === edition.id &&
-        (phase === "all" || match.source_match?.phase === phase),
-    )
-    .map<ResultItem>((match) => ({
-      id: match.id,
-      href: match.source_match_id ? `/match/${match.source_match_id}` : null,
-      status: "completed",
-      phase: match.source_match?.phase || null,
-      playedAt: match.played_at,
-      createdAt: match.created_at,
-      player1: match.player1,
-      player2: match.player2,
-      player1_id: match.player1_id,
-      player2_id: match.player2_id,
-      winner_id: match.winner_id,
-      set1_p1: match.set1_p1,
-      set1_p2: match.set1_p2,
-      set2_p1: match.set2_p1,
-      set2_p2: match.set2_p2,
-      set3_p1: match.set3_p1,
-      set3_p2: match.set3_p2,
-    }));
+  const completedResults = (
+    (completedMatches as MatchWithPlayers[]) || []
+  ).map<ResultItem>((match) => ({
+    id: match.id,
+    href: `/match/${match.id}`,
+    status: "completed",
+    phase: match.phase,
+    playedAt: match.recorded_at,
+    createdAt: match.created_at,
+    player1: match.player1,
+    player2: match.player2,
+    player1_id: match.player1_id,
+    player2_id: match.player2_id,
+    winner_id: match.winner_id,
+    set1_p1: match.set1_p1,
+    set1_p2: match.set1_p2,
+    set2_p1: match.set2_p1,
+    set2_p2: match.set2_p2,
+    set3_p1: match.set3_p1,
+    set3_p2: match.set3_p2,
+  }));
 
   const scheduledResults = (
     (scheduledMatches as MatchWithPlayers[]) || []

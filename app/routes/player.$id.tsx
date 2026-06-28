@@ -1,13 +1,23 @@
 import { Link, useLoaderData } from "react-router";
-import type { Route } from "./+types/player.$id";
+import { getDisplayRating } from "~/lib/elo";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { Player, Match, MatchWithPlayers } from "~/lib/types";
+import type {
+  EloRatingHistoryEntryWithPlayers,
+  MatchWithPlayers,
+  Player,
+  PlayerEloRating,
+} from "~/lib/types";
 import { TIER_POINTS } from "~/lib/types";
+import type { Route } from "./+types/player.$id";
 
 export function meta({ data }: Route.MetaArgs) {
   const player = data?.player;
   return [
-    { title: player ? `${player.name} | PD Table Tennis` : "Player | PD Table Tennis" },
+    {
+      title: player
+        ? `${player.name} | PD Table Tennis`
+        : "Player | PD Table Tennis",
+    },
   ];
 }
 
@@ -27,22 +37,46 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   // Get all matches for this player
   const { data: matches } = await supabase
     .from("edition_matches")
-    .select(`
+    .select(
+      `
       *,
       player1:players!edition_matches_player1_id_fkey(*),
       player2:players!edition_matches_player2_id_fkey(*)
-    `)
+    `,
+    )
     .or(`player1_id.eq.${params.id},player2_id.eq.${params.id}`)
     .eq("status", "completed")
     .order("recorded_at", { ascending: false });
 
   // Calculate stats
-  const stats = calculatePlayerStats(player as Player, (matches as MatchWithPlayers[]) || []);
+  const stats = calculatePlayerStats(
+    player as Player,
+    (matches as MatchWithPlayers[]) || [],
+  );
+  const { data: rating } = await supabase
+    .from("player_elo_ratings")
+    .select("*")
+    .eq("player_id", params.id)
+    .maybeSingle();
+
+  const { data: eloHistory } = await supabase
+    .from("elo_rating_history")
+    .select(
+      `
+      *,
+      opponent:players!elo_rating_history_opponent_id_fkey(*)
+    `,
+    )
+    .eq("player_id", params.id)
+    .order("played_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
   return {
     player: player as Player,
     matches: (matches as MatchWithPlayers[]) || [],
-    stats
+    stats,
+    rating: rating as PlayerEloRating | null,
+    eloHistory: (eloHistory as EloRatingHistoryEntryWithPlayers[]) || [],
   };
 }
 
@@ -56,7 +90,10 @@ interface PlayerStats {
   setDiff: number;
 }
 
-function calculatePlayerStats(player: Player, matches: MatchWithPlayers[]): PlayerStats {
+function calculatePlayerStats(
+  player: Player,
+  matches: MatchWithPlayers[],
+): PlayerStats {
   let wins = 0;
   let losses = 0;
   let points = 0;
@@ -72,7 +109,7 @@ function calculatePlayerStats(player: Player, matches: MatchWithPlayers[]): Play
       wins++;
       // Only count points for league matches
       if (match.phase === "league") {
-        points += TIER_POINTS[opponent.tier as 1|2|3|4];
+        points += TIER_POINTS[opponent.tier as 1 | 2 | 3 | 4];
       }
     } else {
       losses++;
@@ -110,7 +147,8 @@ function calculatePlayerStats(player: Player, matches: MatchWithPlayers[]): Play
 }
 
 export default function PlayerProfile() {
-  const { player, matches, stats } = useLoaderData<typeof loader>();
+  const { player, matches, stats, rating, eloHistory } =
+    useLoaderData<typeof loader>();
 
   return (
     <main className="page">
@@ -134,6 +172,12 @@ export default function PlayerProfile() {
         <h2>Statistics</h2>
         <div className="player-stats-grid">
           <div className="stat-card">
+            <span className="stat-value">
+              {rating ? getDisplayRating(rating.current_rating) : 1000}
+            </span>
+            <span className="stat-label">Current Elo</span>
+          </div>
+          <div className="stat-card">
             <span className="stat-value">{stats.points}</span>
             <span className="stat-label">Points</span>
           </div>
@@ -146,18 +190,64 @@ export default function PlayerProfile() {
             <span className="stat-label">Losses</span>
           </div>
           <div className="stat-card">
-            <span className="stat-value">{stats.matchesPlayed}</span>
-            <span className="stat-label">Matches</span>
+            <span className="stat-value">{rating?.rated_games ?? 0}</span>
+            <span className="stat-label">Rated Matches</span>
           </div>
           <div className="stat-card">
             <span className="stat-value">{stats.setsWon}</span>
             <span className="stat-label">Sets Won</span>
           </div>
           <div className="stat-card">
-            <span className="stat-value">{stats.setDiff > 0 ? `+${stats.setDiff}` : stats.setDiff}</span>
+            <span className="stat-value">
+              {stats.setDiff > 0 ? `+${stats.setDiff}` : stats.setDiff}
+            </span>
             <span className="stat-label">Set Diff</span>
           </div>
         </div>
+      </section>
+
+      <section className="player-stats-section">
+        <h2>Elo History</h2>
+        {eloHistory.length === 0 ? (
+          <p className="empty">No rated matches yet.</p>
+        ) : (
+          <div className="standings-table-container">
+            <table className="data-table standings-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Opponent</th>
+                  <th className="text-center">Result</th>
+                  <th className="text-right">Change</th>
+                  <th className="text-right">Elo</th>
+                  <th className="text-center hide-mobile">K</th>
+                </tr>
+              </thead>
+              <tbody>
+                {eloHistory.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>{new Date(entry.played_at).toLocaleDateString()}</td>
+                    <td>{entry.opponent?.name || "-"}</td>
+                    <td className="text-center">
+                      {entry.result_score === 1 ? "W" : "L"}
+                    </td>
+                    <td className="text-right points-cell">
+                      {entry.rating_change > 0
+                        ? `+${Math.round(entry.rating_change)}`
+                        : Math.round(entry.rating_change)}
+                    </td>
+                    <td className="text-right">
+                      {getDisplayRating(entry.rating_after)}
+                    </td>
+                    <td className="text-center hide-mobile">
+                      {entry.k_factor}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="player-matches-section">

@@ -1,8 +1,9 @@
-import { Link, useLoaderData, Form, data } from "react-router";
-import type { Route } from "./+types/players";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { Form, Link, data, useLoaderData } from "react-router";
 import { requireRole } from "~/lib/auth.server";
+import { rebuildEloRatings } from "~/lib/elo-sync.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type { Player } from "~/lib/types";
+import type { Route } from "./+types/players";
 
 export function meta() {
   return [{ title: "Manage Players | PD Table Tennis" }];
@@ -31,6 +32,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "delete") {
     const id = formData.get("id") as string;
     await supabase.from("players").delete().eq("id", id);
+    await rebuildEloRatings(supabase);
   }
 
   const allHeaders = new Headers(authHeaders);

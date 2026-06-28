@@ -4,13 +4,14 @@ import {
   getActiveEdition,
   listArchivedEditionSummaries,
 } from "~/lib/editions.server";
-import { calculateEloStandings } from "~/lib/elo.server";
+import { buildLeaderboardFromStoredRatings } from "~/lib/elo";
 import { legacyArchiveEntries } from "~/lib/legacy-archive";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import type {
   AppUser,
-  EloMatchWithPlayers,
+  MatchWithPlayers,
   Player,
+  PlayerEloRating,
   TournamentSettings,
 } from "~/lib/types";
 import type { Route } from "./+types/home";
@@ -67,37 +68,28 @@ export async function loader({ request }: Route.LoaderArgs) {
     .neq("phase", "league")
     .eq("status", "scheduled");
 
-  // Get recent ELO results (last 5 completed matches by played date)
+  // Get recent completed matches
   const { data: recentMatches } = await supabase
-    .from("elo_matches")
+    .from("edition_matches")
     .select(
       `
       *,
-      player1:players!elo_matches_player1_id_fkey(*),
-      player2:players!elo_matches_player2_id_fkey(*),
-      winner:players!elo_matches_winner_id_fkey(*)
+      player1:players!edition_matches_player1_id_fkey(*),
+      player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
-    .order("played_at", { ascending: false })
+    .eq("status", "completed")
+    .order("recorded_at", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(5);
 
-  const { data: eloMatches } = await supabase
-    .from("elo_matches")
-    .select(
-      `
-      *,
-      player1:players!elo_matches_player1_id_fkey(*),
-      player2:players!elo_matches_player2_id_fkey(*),
-      winner:players!elo_matches_winner_id_fkey(*)
-    `,
-    )
-    .order("played_at", { ascending: true })
-    .order("created_at", { ascending: true });
+  const { data: ratingRows } = await supabase
+    .from("player_elo_ratings")
+    .select("*");
 
-  const leaderboard = calculateEloStandings(
+  const leaderboard = buildLeaderboardFromStoredRatings(
     (players as Player[]) || [],
-    (eloMatches as EloMatchWithPlayers[]) || [],
+    (ratingRows as PlayerEloRating[]) || [],
   );
 
   // Calculate unique players who have played at least one league match
@@ -114,7 +106,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     completedMatches: completedMatches || 0,
     remainingKnockoutMatches: remainingKnockoutMatches || 0,
     playersWhoPlayed,
-    recentMatches: (recentMatches as EloMatchWithPlayers[]) || [],
+    recentMatches: (recentMatches as MatchWithPlayers[]) || [],
     leaderboard: leaderboard.slice(0, 8),
   };
 }
@@ -178,11 +170,7 @@ export default function Home() {
             <div className="results-list">
               {recentMatches.map((match) => (
                 <Link
-                  to={
-                    match.source_match_id
-                      ? `/match/${match.source_match_id}`
-                      : "/results"
-                  }
+                  to={`/match/${match.id}`}
                   key={match.id}
                   className="result-card"
                 >
@@ -245,6 +233,10 @@ export default function Home() {
         <Link to="/leaderboard" className="quick-link-card">
           <h3>Leaderboard</h3>
           <p>View ongoing ELO ratings</p>
+        </Link>
+        <Link to="/elo" className="quick-link-card">
+          <h3>Elo System</h3>
+          <p>See the formulas, K-factors, and entry rules</p>
         </Link>
         <Link to="/results" className="quick-link-card">
           <h3>Results</h3>
@@ -331,7 +323,7 @@ export default function Home() {
   );
 }
 
-function getMatchScore(match: EloMatchWithPlayers): string {
+function getMatchScore(match: MatchWithPlayers): string {
   let p1Sets = 0;
   let p2Sets = 0;
 
