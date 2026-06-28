@@ -121,9 +121,11 @@ export default function PlayerProfile() {
         <div className="player-profile-info">
           <h1>{player.name}</h1>
           <div className="player-meta">
-            <span className={`tier-badge tier-${player.tier}`}>{player.tier}</span>
-            <span>Tier {player.tier}</span>
-            {player.department && <span>• {player.department}</span>}
+            {player.department ? (
+              <span>{player.department}</span>
+            ) : (
+              <span>No department</span>
+            )}
           </div>
         </div>
       </div>
