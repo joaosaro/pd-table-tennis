@@ -1,5 +1,6 @@
 import { Link, useLoaderData } from "react-router";
 import { getUser } from "~/lib/auth.server";
+import type { EditionStatus } from "~/lib/types";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { getLeagueProgress } from "~/lib/tournament.server";
 import type { MatchWithPlayers } from "~/lib/types";
@@ -37,6 +38,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Match not found", { status: 404 });
   }
 
+  const { data: edition } = await supabase
+    .from("editions")
+    .select("status")
+    .eq("id", match.edition_id)
+    .single();
+
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const { data: players } = await supabase
     .from("players")
@@ -57,11 +64,18 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     (!leagueProgress.isFinished ||
       (match.phase !== "league" && match.status === "scheduled"));
 
-  return { match: match as MatchWithPlayers, canSubmitResult };
+  return {
+    match: match as MatchWithPlayers,
+    canSubmitResult,
+    editionStatus: (edition?.status as EditionStatus | undefined) ?? "active",
+  };
 }
 
 export default function MatchDetails() {
-  const { match, canSubmitResult } = useLoaderData<typeof loader>();
+  const { match, canSubmitResult, editionStatus } =
+    useLoaderData<typeof loader>();
+  const showArchivedLeagueTier =
+    editionStatus === "archived" && match.phase === "league";
 
   const sets = [
     { num: 1, p1: match.set1_p1, p2: match.set1_p2 },
@@ -110,10 +124,16 @@ export default function MatchDetails() {
             <div className="match-player-info">
               <span className="match-player-name">{match.player1.name}</span>
               <span className="match-player-tier">
-                <span className={`tier-badge tier-${match.player1.tier}`}>
-                  {match.player1.tier}
-                </span>
-                {match.player1.department && ` • ${match.player1.department}`}
+                {showArchivedLeagueTier ? (
+                  <span className={`tier-badge tier-${match.player1.tier}`}>
+                    {match.player1.tier}
+                  </span>
+                ) : null}
+                {match.player1.department
+                  ? showArchivedLeagueTier
+                    ? ` • ${match.player1.department}`
+                    : match.player1.department
+                  : null}
               </span>
             </div>
             {match.status === "completed" && (
@@ -135,10 +155,16 @@ export default function MatchDetails() {
             <div className="match-player-info right">
               <span className="match-player-name">{match.player2.name}</span>
               <span className="match-player-tier">
-                {match.player2.department && `${match.player2.department} • `}
-                <span className={`tier-badge tier-${match.player2.tier}`}>
-                  {match.player2.tier}
-                </span>
+                {match.player2.department
+                  ? showArchivedLeagueTier
+                    ? `${match.player2.department} • `
+                    : match.player2.department
+                  : null}
+                {showArchivedLeagueTier ? (
+                  <span className={`tier-badge tier-${match.player2.tier}`}>
+                    {match.player2.tier}
+                  </span>
+                ) : null}
               </span>
             </div>
             <div className="match-player-avatar">
@@ -174,8 +200,8 @@ export default function MatchDetails() {
             {match.phase === "league" ? (
               <p>
                 <strong>{winner.name}</strong> won and earned{" "}
-                <strong>{pointsEarned} points</strong> (opponent tier{" "}
-                {loser.tier})
+                <strong>{pointsEarned} points</strong>
+                {showArchivedLeagueTier ? ` (opponent tier ${loser.tier})` : ""}
               </p>
             ) : (
               <p>

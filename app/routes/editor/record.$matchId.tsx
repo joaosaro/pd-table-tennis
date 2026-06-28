@@ -256,17 +256,11 @@ export default function RecordMatch() {
 
       <div className="record-match-header">
         <div className="record-player">
-          <span className={`tier-badge tier-${match.player1.tier}`}>
-            {match.player1.tier}
-          </span>
           <span className="record-player-name">{match.player1.name}</span>
         </div>
         <span className="record-vs">vs</span>
         <div className="record-player">
           <span className="record-player-name">{match.player2.name}</span>
-          <span className={`tier-badge tier-${match.player2.tier}`}>
-            {match.player2.tier}
-          </span>
         </div>
       </div>
 

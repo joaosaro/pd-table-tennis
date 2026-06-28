@@ -183,16 +183,8 @@ export default function PlayerProfile() {
                   </div>
                   <div className="match-opponent">
                     <span className="opponent-name">{opponent.name}</span>
-                    <span className={`tier-badge tier-${opponent.tier}`}>
-                      {opponent.tier}
-                    </span>
                   </div>
                   <div className="match-score">{score}</div>
-                  {won && match.phase === "league" && (
-                    <div className="match-points">
-                      +{TIER_POINTS[opponent.tier as 1|2|3|4]} pts
-                    </div>
-                  )}
                 </Link>
               );
             })}

@@ -78,10 +78,6 @@ export default function AdminIndex() {
             <h3>Generate Matches</h3>
             <p>Create league or knockout matches</p>
           </Link>
-          <Link to="/admin/tiers" className="action-card">
-            <h3>Assign Tiers</h3>
-            <p>Set player skill tiers</p>
-          </Link>
           <Link to="/admin/users" className="action-card">
             <h3>Manage Users</h3>
             <p>Assign roles to users</p>

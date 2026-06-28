@@ -80,6 +80,7 @@ export default function Standings() {
   const { standings, departments, qualification, edition } =
     useLoaderData<typeof loader>();
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  const showArchivedLeagueTier = edition.status === "archived";
 
   const filteredStandings = useMemo(() => {
     if (!selectedDepartment) return standings;
@@ -131,7 +132,9 @@ export default function Standings() {
               <tr>
                 <th className="text-center">#</th>
                 <th>Player</th>
-                <th className="text-center hide-mobile">Tier</th>
+                {showArchivedLeagueTier ? (
+                  <th className="text-center hide-mobile">Tier</th>
+                ) : null}
                 <th className="text-center">P</th>
                 <th className="text-center">W</th>
                 <th className="text-center">L</th>
@@ -173,11 +176,15 @@ export default function Standings() {
                       )}
                     </Link>
                   </td>
-                  <td className="text-center hide-mobile">
-                    <span className={`tier-badge tier-${standing.player.tier}`}>
-                      {standing.player.tier}
-                    </span>
-                  </td>
+                  {showArchivedLeagueTier ? (
+                    <td className="text-center hide-mobile">
+                      <span
+                        className={`tier-badge tier-${standing.player.tier}`}
+                      >
+                        {standing.player.tier}
+                      </span>
+                    </td>
+                  ) : null}
                   <td className="text-center">{standing.matchesPlayed}</td>
                   <td className="text-center">{standing.wins}</td>
                   <td className="text-center">{standing.losses}</td>
@@ -240,67 +247,72 @@ export default function Standings() {
         </ol>
       </section>
 
-      <section className="standings-tiebreak">
-        <h2>How league points work (2025-based tiers)</h2>
-        <p>
-          This league uses weighted points. You do not get the same points for
-          every win.
-        </p>
-        <p>
-          When you win, your points depend on the tier of the opponent you beat.
-          Tiers are based on 2025 results.
-        </p>
-        <ul>
-          <li>Beat a Tier 1 player: 4 points</li>
-          <li>Beat a Tier 2 player: 3 points</li>
-          <li>Beat a Tier 3 player: 2 points</li>
-          <li>Beat a Tier 4 player: 1 point</li>
-        </ul>
-        <p>
-          If you lose, you get 0 points. This rewards wins against stronger
-          opponents.
-        </p>
-      </section>
+      {showArchivedLeagueTier ? (
+        <>
+          <section className="standings-tiebreak">
+            <h2>How league points work (2025-based tiers)</h2>
+            <p>
+              This league uses weighted points. You do not get the same points
+              for every win.
+            </p>
+            <p>
+              When you win, your points depend on the tier of the opponent you
+              beat. Tiers are based on 2025 results.
+            </p>
+            <ul>
+              <li>Beat a Tier 1 player: 4 points</li>
+              <li>Beat a Tier 2 player: 3 points</li>
+              <li>Beat a Tier 3 player: 2 points</li>
+              <li>Beat a Tier 4 player: 1 point</li>
+            </ul>
+            <p>
+              If you lose, you get 0 points. This rewards wins against stronger
+              opponents.
+            </p>
+          </section>
 
-      <section className="standings-tiebreak standings-faq">
-        <h2>FAQ (with examples)</h2>
+          <section className="standings-tiebreak standings-faq">
+            <h2>FAQ (with examples)</h2>
 
-        <div className="faq-item">
-          <h3>Why can someone with fewer wins be above me?</h3>
-          <p>
-            Because points are weighted by opponent tier. Example: Player A has
-            3 wins vs Tier 4 players (3 points total). Player B has 1 win vs a
-            Tier 1 player (4 points total). Player B ranks higher.
-          </p>
-        </div>
+            <div className="faq-item">
+              <h3>Why can someone with fewer wins be above me?</h3>
+              <p>
+                Because points are weighted by opponent tier. Example: Player A
+                has 3 wins vs Tier 4 players (3 points total). Player B has 1
+                win vs a Tier 1 player (4 points total). Player B ranks higher.
+              </p>
+            </div>
 
-        <div className="faq-item">
-          <h3>Do I get points if I lose 2-1?</h3>
-          <p>
-            No. A loss always gives 0 league points, even in a close match. Set
-            score still matters later for tie-breaks (set difference and points
-            scored).
-          </p>
-        </div>
+            <div className="faq-item">
+              <h3>Do I get points if I lose 2-1?</h3>
+              <p>
+                No. A loss always gives 0 league points, even in a close match.
+                Set score still matters later for tie-breaks (set difference and
+                points scored).
+              </p>
+            </div>
 
-        <div className="faq-item">
-          <h3>How does head-to-head work in a tie?</h3>
-          <p>
-            It only looks at results between tied players. Example: if Ana, Rui
-            and Joao are tied on points, the system compares only matches among
-            those three before moving to the next tie-break rule.
-          </p>
-        </div>
+            <div className="faq-item">
+              <h3>How does head-to-head work in a tie?</h3>
+              <p>
+                It only looks at results between tied players. Example: if Ana,
+                Rui and Joao are tied on points, the system compares only
+                matches among those three before moving to the next tie-break
+                rule.
+              </p>
+            </div>
 
-        <div className="faq-item">
-          <h3>Can playing more matches help in ties?</h3>
-          <p>
-            Yes. After head-to-head, more matches played is the next rule.
-            Example: two players tied on points and head-to-head, with 8 matches
-            vs 7 matches played; the player with 8 is ranked higher.
-          </p>
-        </div>
-      </section>
+            <div className="faq-item">
+              <h3>Can playing more matches help in ties?</h3>
+              <p>
+                Yes. After head-to-head, more matches played is the next rule.
+                Example: two players tied on points and head-to-head, with 8
+                matches vs 7 matches played; the player with 8 is ranked higher.
+              </p>
+            </div>
+          </section>
+        </>
+      ) : null}
     </main>
   );
 }

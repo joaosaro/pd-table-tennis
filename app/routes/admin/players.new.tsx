@@ -22,7 +22,6 @@ export async function action({ request }: Route.ActionArgs) {
   const department = (formData.get("department") as string)?.trim() || null;
   const slackHandleRaw = (formData.get("slack_handle") as string) || "";
   const slack_handle = normalizeSlackHandle(slackHandleRaw);
-  const tier = parseInt(formData.get("tier") as string) || 4;
   const disabled = formData.get("disabled") === "on";
 
   if (!name) {
@@ -33,7 +32,7 @@ export async function action({ request }: Route.ActionArgs) {
     name,
     department,
     slack_handle,
-    tier,
+    tier: 4,
     disabled,
   });
 
@@ -99,24 +98,6 @@ export default function AdminPlayersNew() {
             placeholder="e.g. joaosaro"
             disabled={isSubmitting}
           />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="tier" className="form-label">
-            Tier
-          </label>
-          <select
-            id="tier"
-            name="tier"
-            className="form-select"
-            defaultValue="4"
-            disabled={isSubmitting}
-          >
-            <option value="1">Tier 1 (Hardest - 4 pts)</option>
-            <option value="2">Tier 2 (3 pts)</option>
-            <option value="3">Tier 3 (2 pts)</option>
-            <option value="4">Tier 4 (Easiest - 1 pt)</option>
-          </select>
         </div>
 
         <div className="form-group">

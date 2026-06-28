@@ -27,7 +27,6 @@ export default [
   route("admin/players", "routes/admin/players.tsx"),
   route("admin/players/new", "routes/admin/players.new.tsx"),
   route("admin/players/:id/edit", "routes/admin/players.$id.edit.tsx"),
-  route("admin/tiers", "routes/admin/tiers.tsx"),
   route("admin/matches", "routes/admin/matches.tsx"),
   route("admin/generate", "routes/admin/generate.tsx"),
   route("admin/settings", "routes/admin/settings.tsx"),

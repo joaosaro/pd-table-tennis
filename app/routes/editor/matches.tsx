@@ -218,9 +218,6 @@ export default function EditorMatches() {
               <div key={match.id} className="results-card scheduled">
                 <div className="results-card-main">
                   <div className="results-player">
-                    <span className={`tier-badge tier-${match.player1.tier}`}>
-                      {match.player1.tier}
-                    </span>
                     <span>{match.player1.name}</span>
                   </div>
                   <div className="results-vs">
@@ -228,9 +225,6 @@ export default function EditorMatches() {
                   </div>
                   <div className="results-player">
                     <span>{match.player2.name}</span>
-                    <span className={`tier-badge tier-${match.player2.tier}`}>
-                      {match.player2.tier}
-                    </span>
                   </div>
                 </div>
                 <div className="results-card-actions">
@@ -260,9 +254,6 @@ export default function EditorMatches() {
               <div key={match.id} className="results-card completed">
                 <div className="results-card-main">
                   <div className="results-player">
-                    <span className={`tier-badge tier-${match.player1.tier}`}>
-                      {match.player1.tier}
-                    </span>
                     <span
                       className={
                         match.winner_id === match.player1_id ? "winner" : ""
@@ -281,9 +272,6 @@ export default function EditorMatches() {
                       }
                     >
                       {match.player2.name}
-                    </span>
-                    <span className={`tier-badge tier-${match.player2.tier}`}>
-                      {match.player2.tier}
                     </span>
                   </div>
                 </div>

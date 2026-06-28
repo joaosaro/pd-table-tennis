@@ -60,7 +60,6 @@ export default function AdminPlayers() {
               <th>Name</th>
               <th>Department</th>
               <th>Slack</th>
-              <th className="text-center">Tier</th>
               <th>Status</th>
               <th className="text-right">Actions</th>
             </tr>
@@ -73,11 +72,6 @@ export default function AdminPlayers() {
                 </td>
                 <td>{player.department || "-"}</td>
                 <td>{player.slack_handle ? `@${player.slack_handle}` : "-"}</td>
-                <td className="text-center">
-                  <span className={`tier-badge tier-${player.tier}`}>
-                    {player.tier}
-                  </span>
-                </td>
                 <td>{player.disabled ? "Disabled" : "Active"}</td>
                 <td className="text-right">
                   <div className="action-buttons">

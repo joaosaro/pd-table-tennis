@@ -187,6 +187,7 @@ export default function Results() {
     useLoaderData<typeof loader>();
   const { user } = useOutletContext<{ user: AppUser | null }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const showArchivedLeagueTier = edition.status === "archived";
 
   const currentStatus = searchParams.get("status") || "all";
   const currentPhase = searchParams.get("phase") || "all";
@@ -280,7 +281,11 @@ export default function Results() {
       ) : (
         <div className="results-list">
           {results.map((match) => (
-            <ResultCard key={match.id} match={match} />
+            <ResultCard
+              key={match.id}
+              match={match}
+              showArchivedLeagueTier={showArchivedLeagueTier}
+            />
           ))}
         </div>
       )}
@@ -288,14 +293,23 @@ export default function Results() {
   );
 }
 
-function ResultCard({ match }: { match: ResultItem }) {
+function ResultCard({
+  match,
+  showArchivedLeagueTier,
+}: {
+  match: ResultItem;
+  showArchivedLeagueTier: boolean;
+}) {
+  const showTier = showArchivedLeagueTier && match.phase === "league";
   const content = (
     <>
       <div className="results-card-main">
         <div className="results-player">
-          <span className={`tier-badge tier-${match.player1.tier}`}>
-            {match.player1.tier}
-          </span>
+          {showTier ? (
+            <span className={`tier-badge tier-${match.player1.tier}`}>
+              {match.player1.tier}
+            </span>
+          ) : null}
           <span
             className={match.winner_id === match.player1_id ? "winner" : ""}
           >
@@ -315,9 +329,11 @@ function ResultCard({ match }: { match: ResultItem }) {
           >
             {match.player2.name}
           </span>
-          <span className={`tier-badge tier-${match.player2.tier}`}>
-            {match.player2.tier}
-          </span>
+          {showTier ? (
+            <span className={`tier-badge tier-${match.player2.tier}`}>
+              {match.player2.tier}
+            </span>
+          ) : null}
         </div>
       </div>
       <div className="results-card-meta">

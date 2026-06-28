@@ -237,7 +237,7 @@ export default function RecordLeagueMatch() {
               <option value="">Select player...</option>
               {players.map((player) => (
                 <option key={player.id} value={player.id}>
-                  {player.name} (Tier {player.tier})
+                  {player.name}
                 </option>
               ))}
             </select>
@@ -268,7 +268,7 @@ export default function RecordLeagueMatch() {
                     value={player.id}
                     disabled={alreadyPlayed}
                   >
-                    {player.name} (Tier {player.tier})
+                    {player.name}
                     {alreadyPlayed ? " ✓ played" : ""}
                   </option>
                 );
@@ -281,17 +281,11 @@ export default function RecordLeagueMatch() {
           <>
             <div className="record-match-header">
               <div className="record-player">
-                <span className={`tier-badge tier-${player1.tier}`}>
-                  {player1.tier}
-                </span>
                 <span className="record-player-name">{player1.name}</span>
               </div>
               <span className="record-vs">vs</span>
               <div className="record-player">
                 <span className="record-player-name">{player2.name}</span>
-                <span className={`tier-badge tier-${player2.tier}`}>
-                  {player2.tier}
-                </span>
               </div>
             </div>
 
