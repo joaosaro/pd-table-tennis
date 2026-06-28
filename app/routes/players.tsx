@@ -16,7 +16,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: players, error } = await supabase
     .from("players")
     .select("*")
-    .eq("disabled", false)
     .order("name", { ascending: true });
 
   if (error) {
@@ -28,8 +27,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function Players() {
   const { players } = useLoaderData<typeof loader>();
+  const activePlayers = players.filter((player) => !player.disabled);
+  const alumniPlayers = players.filter((player) => player.disabled);
 
-  const playersByDepartment = players.reduce(
+  const playersByDepartment = activePlayers.reduce(
     (acc, player) => {
       const department = player.department?.trim() || "No department";
 
@@ -54,10 +55,13 @@ export default function Players() {
     <main className="page">
       <div className="page-header">
         <h1>Participants</h1>
-        <p>{players.length} participants</p>
+        <p>
+          {activePlayers.length} participants
+          {alumniPlayers.length > 0 ? ` • ${alumniPlayers.length} alumni` : ""}
+        </p>
       </div>
 
-      {players.length === 0 ? (
+      {activePlayers.length === 0 ? (
         <p className="empty">No players registered yet.</p>
       ) : (
         <div className="players-by-tier">
@@ -84,6 +88,31 @@ export default function Players() {
           ))}
         </div>
       )}
+
+      {alumniPlayers.length > 0 ? (
+        <section className="alumni-section">
+          <h2 className="tier-heading">Alumni</h2>
+          <div className="players-grid">
+            {alumniPlayers.map((player) => (
+              <Link
+                key={player.id}
+                to={`/player/${player.id}`}
+                className="player-card player-card-alumni"
+              >
+                <div className="player-avatar player-avatar-alumni">
+                  {player.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="player-info">
+                  <span className="player-name">{player.name}</span>
+                  <span className="player-department">
+                    {player.department?.trim() || "No department"}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
