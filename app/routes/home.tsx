@@ -1,4 +1,9 @@
 import { Link, useLoaderData, useOutletContext } from "react-router";
+import { formatEditionLabel } from "~/lib/editions";
+import {
+  getActiveEdition,
+  listArchivedEditionSummaries,
+} from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
@@ -21,6 +26,7 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
+  const activeEdition = await getActiveEdition(supabase);
 
   // Get tournament settings
   const { data: settings } = await supabase
@@ -44,18 +50,21 @@ export async function loader({ request }: Route.LoaderArgs) {
       player2:players!edition_matches_player2_id_fkey(*)
     `,
     )
+    .eq("edition_id", activeEdition?.id || "")
     .eq("phase", "league")
     .eq("status", "completed");
 
   const { count: completedMatches } = await supabase
     .from("edition_matches")
     .select("*", { count: "exact", head: true })
+    .eq("edition_id", activeEdition?.id || "")
     .eq("phase", "league")
     .eq("status", "completed");
 
   const { count: remainingKnockoutMatches } = await supabase
     .from("edition_matches")
     .select("*", { count: "exact", head: true })
+    .eq("edition_id", activeEdition?.id || "")
     .neq("phase", "league")
     .eq("status", "scheduled");
 
@@ -70,6 +79,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       winner:players!edition_matches_winner_id_fkey(*)
     `,
     )
+    .eq("edition_id", activeEdition?.id || "")
     .eq("status", "completed")
     .order("recorded_at", { ascending: false })
     .limit(7);
@@ -92,8 +102,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const playersWhoPlayed = new Set(
     (leagueMatches || []).flatMap((m) => [m.player1_id, m.player2_id]),
   ).size;
+  const archivedEditions = await listArchivedEditionSummaries(supabase, 2);
 
   return {
+    activeEdition,
+    archivedEditions,
     settings: settings as TournamentSettings | null,
     playerCount: (players || []).length,
     completedMatches: completedMatches || 0,
@@ -107,6 +120,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function Home() {
   const {
+    activeEdition,
+    archivedEditions,
     settings,
     playerCount,
     completedMatches,
@@ -124,6 +139,11 @@ export default function Home() {
       <section className="hero">
         <h1>{settings?.name || "PD Table Tennis"}</h1>
         <p className="hero-subtitle">Pipedrive Table Tennis Tournament</p>
+        {activeEdition && (
+          <p className="hero-subtitle hero-subtitle--secondary">
+            {formatEditionLabel(activeEdition)}
+          </p>
+        )}
       </section>
 
       <section className="stats-grid">
@@ -146,37 +166,6 @@ export default function Home() {
       </section>
 
       <section className="home-columns">
-        <div className="home-column">
-          <div className="column-header">
-            <h2>Standings</h2>
-            <Link to="/standings" className="view-all-link">
-              View all
-            </Link>
-          </div>
-          {standings.length > 0 ? (
-            <div className="mini-standings">
-              {standings.map((standing) => (
-                <Link
-                  key={standing.player.id}
-                  to={`/player/${standing.player.id}`}
-                  className={`mini-standing-row ${getRankClass(
-                    standing.player.id,
-                    qualification,
-                  )}`}
-                >
-                  <span className="mini-rank">{standing.rank}</span>
-                  <span className="mini-player-name">
-                    {standing.player.name}
-                  </span>
-                  <span className="mini-points">{standing.points} pts</span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="empty">No standings yet.</p>
-          )}
-        </div>
-
         <div className="home-column">
           <div className="column-header">
             <h2>Recent Results</h2>
@@ -217,6 +206,39 @@ export default function Home() {
             <p className="empty">No results yet.</p>
           )}
         </div>
+
+        <div className="home-column">
+          <div className="column-header">
+            <h2>Archive</h2>
+            <Link to="/archive" className="view-all-link">
+              View all
+            </Link>
+          </div>
+          {activeEdition && standings.length > 0 ? (
+            <div className="mini-standings">
+              {standings.slice(0, 5).map((standing) => (
+                <Link
+                  key={standing.player.id}
+                  to={`/player/${standing.player.id}`}
+                  className={`mini-standing-row ${getRankClass(
+                    standing.player.id,
+                    qualification,
+                  )}`}
+                >
+                  <span className="mini-rank">{standing.rank}</span>
+                  <span className="mini-player-name">
+                    {standing.player.name}
+                  </span>
+                  <span className="mini-points">{standing.points} pts</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="empty">
+              Standings and bracket are available from the archive.
+            </p>
+          )}
+        </div>
       </section>
 
       <section className="quick-links">
@@ -224,17 +246,13 @@ export default function Home() {
           <h3>Leaderboard</h3>
           <p>View ongoing ELO ratings</p>
         </Link>
-        <Link to="/standings" className="quick-link-card">
-          <h3>Standings</h3>
-          <p>View current league rankings</p>
-        </Link>
         <Link to="/results" className="quick-link-card">
           <h3>Results</h3>
           <p>See all matches and results</p>
         </Link>
-        <Link to="/recommendations" className="quick-link-card">
-          <h3>Match Suggestions</h3>
-          <p>Try match finder</p>
+        <Link to="/archive" className="quick-link-card">
+          <h3>Archive</h3>
+          <p>Browse past standings, brackets, and champions</p>
         </Link>
         {canEdit && (
           <Link
@@ -246,6 +264,41 @@ export default function Home() {
           </Link>
         )}
       </section>
+
+      {archivedEditions.length > 0 && (
+        <section className="archive-preview">
+          <div className="column-header">
+            <h2>Previous Sessions</h2>
+            <Link to="/archive" className="view-all-link">
+              View archive
+            </Link>
+          </div>
+          <div className="archive-grid">
+            {archivedEditions.map((edition) => (
+              <article key={edition.id} className="archive-card">
+                <div className="archive-card-header">
+                  <div>
+                    <h3>{formatEditionLabel(edition)}</h3>
+                    <p>{edition.name}</p>
+                  </div>
+                  {edition.champion && (
+                    <span className="archive-champion-badge">Champion</span>
+                  )}
+                </div>
+                <div className="archive-card-body">
+                  <p className="archive-champion-name">
+                    {edition.champion?.name || "Champion pending"}
+                  </p>
+                </div>
+                <div className="archive-card-links">
+                  <Link to={`/standings?edition=${edition.id}`}>Standings</Link>
+                  <Link to={`/bracket?edition=${edition.id}`}>Bracket</Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

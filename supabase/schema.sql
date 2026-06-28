@@ -171,18 +171,6 @@ WHERE status = 'completed'
   AND winner_id IS NOT NULL
 ON CONFLICT (source_match_id) WHERE source_type = 'edition_match' DO NOTHING;
 
--- Weekly match recommendations
-CREATE TABLE IF NOT EXISTS weekly_recommendations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  week_date DATE NOT NULL,
-  player1_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-  player2_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-  is_extra_match BOOLEAN DEFAULT false,
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT different_recommendation_players CHECK (player1_id != player2_id)
-);
-
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_edition_matches_edition ON edition_matches(edition_id);
 CREATE INDEX IF NOT EXISTS idx_edition_matches_season ON edition_matches(season);
@@ -196,7 +184,6 @@ CREATE INDEX IF NOT EXISTS idx_elo_matches_season ON elo_matches(season);
 CREATE INDEX IF NOT EXISTS idx_elo_matches_played_at ON elo_matches(played_at);
 CREATE INDEX IF NOT EXISTS idx_players_tier ON players(tier);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_players_slack_handle ON players(slack_handle);
-CREATE INDEX IF NOT EXISTS idx_recommendations_week_date ON weekly_recommendations(week_date);
 
 -- Enable Row Level Security
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
@@ -205,7 +192,6 @@ ALTER TABLE editions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE edition_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE elo_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tournament_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE weekly_recommendations ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 
@@ -308,20 +294,6 @@ CREATE POLICY "Anyone can view tournament settings" ON tournament_settings
 
 CREATE POLICY "Admins can update tournament settings" ON tournament_settings
   FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
-  );
-
--- Weekly recommendations: Public read, Admin write
-CREATE POLICY "Anyone can view recommendations" ON weekly_recommendations
-  FOR SELECT USING (true);
-
-CREATE POLICY "Admins can insert recommendations" ON weekly_recommendations
-  FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
-  );
-
-CREATE POLICY "Admins can delete recommendations" ON weekly_recommendations
-  FOR DELETE USING (
     EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
   );
 
