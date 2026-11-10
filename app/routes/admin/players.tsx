@@ -1,9 +1,8 @@
-import { Form, Link, data, useLoaderData } from "react-router";
-import { requireRole } from "~/lib/auth.server";
-import { rebuildEloRatings } from "~/lib/elo-sync.server";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { Player } from "~/lib/types";
+import { Link, useLoaderData, Form, data } from "react-router";
 import type { Route } from "./+types/players";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { requireRole } from "~/lib/auth.server";
+import type { Player } from "~/lib/types";
 
 export function meta() {
   return [{ title: "Manage Players | PD Table Tennis" }];
@@ -32,7 +31,6 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "delete") {
     const id = formData.get("id") as string;
     await supabase.from("players").delete().eq("id", id);
-    await rebuildEloRatings(supabase);
   }
 
   const allHeaders = new Headers(authHeaders);
@@ -62,7 +60,7 @@ export default function AdminPlayers() {
               <th>Name</th>
               <th>Department</th>
               <th>Slack</th>
-              <th>Status</th>
+              <th className="text-center">Tier</th>
               <th className="text-right">Actions</th>
             </tr>
           </thead>
@@ -74,7 +72,11 @@ export default function AdminPlayers() {
                 </td>
                 <td>{player.department || "-"}</td>
                 <td>{player.slack_handle ? `@${player.slack_handle}` : "-"}</td>
-                <td>{player.disabled ? "Disabled" : "Active"}</td>
+                <td className="text-center">
+                  <span className={`tier-badge tier-${player.tier}`}>
+                    {player.tier}
+                  </span>
+                </td>
                 <td className="text-right">
                   <div className="action-buttons">
                     <Link

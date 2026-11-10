@@ -4,33 +4,9 @@ import {
   useOutletContext,
   useSearchParams,
 } from "react-router";
-import { formatEditionLabel } from "~/lib/editions";
-import { getEditionForRequest, listEditions } from "~/lib/editions.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import type { AppUser, Edition, MatchWithPlayers } from "~/lib/types";
+import type { AppUser, MatchWithPlayers } from "~/lib/types";
 import type { Route } from "./+types/results";
-
-const RESULTS_PER_PAGE = 20;
-
-type ResultItem = {
-  id: string;
-  href: string | null;
-  status: "completed" | "scheduled";
-  phase: string | null;
-  playedAt: string | null;
-  createdAt: string;
-  player1: MatchWithPlayers["player1"];
-  player2: MatchWithPlayers["player2"];
-  player1_id: string;
-  player2_id: string;
-  winner_id: string | null;
-  set1_p1: number | null;
-  set1_p2: number | null;
-  set2_p1: number | null;
-  set2_p2: number | null;
-  set3_p1: number | null;
-  set3_p2: number | null;
-};
 
 export function meta() {
   return [
@@ -42,19 +18,9 @@ export function meta() {
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
   const url = new URL(request.url);
-  const requestedEditionId = url.searchParams.get("edition");
-  const [editions, edition] = await Promise.all([
-    listEditions(supabase),
-    getEditionForRequest(supabase, requestedEditionId),
-  ]);
   const status = url.searchParams.get("status") || "all";
   const phase = url.searchParams.get("phase") || "all";
   const playerId = url.searchParams.get("player") || "all";
-  const requestedPage = Number(url.searchParams.get("page") || "1");
-
-  if (!edition) {
-    throw new Response("Edition not found", { status: 404 });
-  }
 
   // Fetch all players for the filter dropdown
   const { data: players } = await supabase
@@ -62,158 +28,48 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("id, name")
     .order("name", { ascending: true });
 
-  const shouldLoadCompleted = status === "all" || status === "completed";
-  const shouldLoadScheduled = status === "all" || status === "scheduled";
-
-  let completedQuery = supabase
-    .from("edition_matches")
+  let query = supabase
+    .from("matches")
     .select(
       `
       *,
-      player1:players!edition_matches_player1_id_fkey(*),
-      player2:players!edition_matches_player2_id_fkey(*)
+      player1:players!matches_player1_id_fkey(*),
+      player2:players!matches_player2_id_fkey(*)
     `,
     )
-    .eq("edition_id", edition.id)
-    .eq("status", "completed")
-    .order("recorded_at", { ascending: false })
     .order("created_at", { ascending: false });
 
+  if (status !== "all") {
+    query = query.eq("status", status);
+  }
+
   if (phase !== "all") {
-    completedQuery = completedQuery.eq("phase", phase);
+    query = query.eq("phase", phase);
   }
 
   if (playerId !== "all") {
-    completedQuery = completedQuery.or(
-      `player1_id.eq.${playerId},player2_id.eq.${playerId}`,
-    );
+    query = query.or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`);
   }
 
-  let scheduledQuery = supabase
-    .from("edition_matches")
-    .select(
-      `
-      *,
-      player1:players!edition_matches_player1_id_fkey(*),
-      player2:players!edition_matches_player2_id_fkey(*)
-    `,
-    )
-    .eq("edition_id", edition.id)
-    .eq("status", "scheduled")
-    .order("created_at", { ascending: false });
-
-  if (phase !== "all") {
-    scheduledQuery = scheduledQuery.eq("phase", phase);
-  }
-
-  if (playerId !== "all") {
-    scheduledQuery = scheduledQuery.or(
-      `player1_id.eq.${playerId},player2_id.eq.${playerId}`,
-    );
-  }
-
-  const [{ data: completedMatches }, { data: scheduledMatches }] =
-    await Promise.all([
-      shouldLoadCompleted ? completedQuery : Promise.resolve({ data: [] }),
-      shouldLoadScheduled ? scheduledQuery : Promise.resolve({ data: [] }),
-    ]);
-
-  const completedResults = (
-    (completedMatches as MatchWithPlayers[]) || []
-  ).map<ResultItem>((match) => ({
-    id: match.id,
-    href: `/match/${match.id}`,
-    status: "completed",
-    phase: match.phase,
-    playedAt: match.recorded_at,
-    createdAt: match.created_at,
-    player1: match.player1,
-    player2: match.player2,
-    player1_id: match.player1_id,
-    player2_id: match.player2_id,
-    winner_id: match.winner_id,
-    set1_p1: match.set1_p1,
-    set1_p2: match.set1_p2,
-    set2_p1: match.set2_p1,
-    set2_p2: match.set2_p2,
-    set3_p1: match.set3_p1,
-    set3_p2: match.set3_p2,
-  }));
-
-  const scheduledResults = (
-    (scheduledMatches as MatchWithPlayers[]) || []
-  ).map<ResultItem>((match) => ({
-    id: match.id,
-    href: `/match/${match.id}`,
-    status: "scheduled",
-    phase: match.phase,
-    playedAt: null,
-    createdAt: match.created_at,
-    player1: match.player1,
-    player2: match.player2,
-    player1_id: match.player1_id,
-    player2_id: match.player2_id,
-    winner_id: match.winner_id,
-    set1_p1: match.set1_p1,
-    set1_p2: match.set1_p2,
-    set2_p1: match.set2_p1,
-    set2_p2: match.set2_p2,
-    set3_p1: match.set3_p1,
-    set3_p2: match.set3_p2,
-  }));
-
-  const results = [...completedResults, ...scheduledResults].sort((a, b) => {
-    const aDate = a.playedAt || a.createdAt;
-    const bDate = b.playedAt || b.createdAt;
-    return new Date(bDate).getTime() - new Date(aDate).getTime();
-  });
-
-  const totalResults = results.length;
-  const totalPages = Math.max(1, Math.ceil(totalResults / RESULTS_PER_PAGE));
-  const currentPage =
-    Number.isFinite(requestedPage) && requestedPage > 0
-      ? Math.min(Math.floor(requestedPage), totalPages)
-      : 1;
-  const pageResults = results.slice(
-    (currentPage - 1) * RESULTS_PER_PAGE,
-    currentPage * RESULTS_PER_PAGE,
-  );
+  const { data: matches } = await query;
 
   return {
-    edition,
-    editions,
-    results: pageResults,
-    totalResults,
-    completedCount: completedResults.length,
-    scheduledCount: scheduledResults.length,
+    matches: (matches as MatchWithPlayers[]) || [],
     players: players || [],
-    pagination: {
-      currentPage,
-      totalPages,
-      perPage: RESULTS_PER_PAGE,
-    },
   };
 }
 
 export default function Results() {
-  const {
-    edition,
-    editions,
-    results,
-    totalResults,
-    completedCount,
-    scheduledCount,
-    players,
-    pagination,
-  } = useLoaderData<typeof loader>();
+  const { matches, players } = useLoaderData<typeof loader>();
   const { user } = useOutletContext<{ user: AppUser | null }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const showArchivedLeagueTier = edition.status === "archived";
 
   const currentStatus = searchParams.get("status") || "all";
   const currentPhase = searchParams.get("phase") || "all";
   const currentPlayer = searchParams.get("player") || "all";
-  const currentEdition = searchParams.get("edition") || edition.id;
+
+  const completedMatches = matches.filter((m) => m.status === "completed");
+  const scheduledMatches = matches.filter((m) => m.status === "scheduled");
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
@@ -224,20 +80,7 @@ export default function Results() {
     } else {
       newParams.set(key, value);
     }
-    newParams.delete("page");
     setSearchParams(newParams);
-  }
-
-  function getPageHref(page: number) {
-    const newParams = new URLSearchParams(searchParams);
-    if (page <= 1) {
-      newParams.delete("page");
-    } else {
-      newParams.set("page", String(page));
-    }
-
-    const query = newParams.toString();
-    return query ? `/results?${query}` : "/results";
   }
 
   return (
@@ -245,17 +88,9 @@ export default function Results() {
       <div className="page-header">
         <h1>Results</h1>
         <p>
-          {completedCount} completed, {scheduledCount} remaining
+          {completedMatches.length} completed, {scheduledMatches.length}{" "}
+          remaining
         </p>
-        <div className="edition-context-links">
-          <span className="edition-context-label">
-            {formatEditionLabel(edition)}
-          </span>
-          <Link to="/archive">Archive</Link>
-          {edition.status === "archived" ? (
-            <Link to="/results">Current results</Link>
-          ) : null}
-        </div>
       </div>
 
       {canEdit && (
@@ -267,20 +102,6 @@ export default function Results() {
       )}
 
       <div className="results-filters">
-        <div className="filter-group">
-          <label>Season:</label>
-          <select
-            value={currentEdition}
-            onChange={(e) => updateFilter("edition", e.target.value)}
-            className="form-select"
-          >
-            {editions.map((season) => (
-              <option key={season.id} value={season.id}>
-                {getEditionOptionLabel(season)}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="filter-group">
           <label>Status:</label>
           <select
@@ -325,155 +146,66 @@ export default function Results() {
         </div>
       </div>
 
-      {results.length === 0 ? (
+      {matches.length === 0 ? (
         <p className="empty">No matches found.</p>
       ) : (
-        <>
-          <div className="results-pagination-summary">
-            <span>
-              Showing{" "}
-              {Math.min(
-                (pagination.currentPage - 1) * pagination.perPage + 1,
-                totalResults,
-              )}{" "}
-              -{" "}
-              {Math.min(
-                pagination.currentPage * pagination.perPage,
-                totalResults,
-              )}{" "}
-              of {totalResults}
-            </span>
-            <span>
-              Page {pagination.currentPage} of {pagination.totalPages}
-            </span>
-          </div>
-          <div className="results-list">
-            {results.map((match) => (
-              <ResultCard
-                key={match.id}
-                match={match}
-                showArchivedLeagueTier={showArchivedLeagueTier}
-              />
-            ))}
-          </div>
-          {pagination.totalPages > 1 ? (
-            <div className="results-pagination">
-              <Link
-                to={getPageHref(pagination.currentPage - 1)}
-                className={`btn btn-secondary ${
-                  pagination.currentPage === 1 ? "disabled" : ""
-                }`}
-                aria-disabled={pagination.currentPage === 1}
-                tabIndex={pagination.currentPage === 1 ? -1 : undefined}
-              >
-                Previous
-              </Link>
-              <span className="results-pagination-current">
-                Page {pagination.currentPage} / {pagination.totalPages}
-              </span>
-              <Link
-                to={getPageHref(pagination.currentPage + 1)}
-                className={`btn btn-secondary ${
-                  pagination.currentPage === pagination.totalPages
-                    ? "disabled"
-                    : ""
-                }`}
-                aria-disabled={pagination.currentPage === pagination.totalPages}
-                tabIndex={
-                  pagination.currentPage === pagination.totalPages
-                    ? -1
-                    : undefined
-                }
-              >
-                Next
-              </Link>
-            </div>
-          ) : null}
-        </>
+        <div className="results-list">
+          {matches.map((match) => (
+            <Link
+              key={match.id}
+              to={`/match/${match.id}`}
+              className={`results-card ${match.status}`}
+            >
+              <div className="results-card-main">
+                <div className="results-player">
+                  <span className={`tier-badge tier-${match.player1.tier}`}>
+                    {match.player1.tier}
+                  </span>
+                  <span
+                    className={
+                      match.winner_id === match.player1_id ? "winner" : ""
+                    }
+                  >
+                    {match.player1.name}
+                  </span>
+                </div>
+                <div className="results-vs">
+                  {match.status === "completed" ? (
+                    <span className="results-score">{getSetScore(match)}</span>
+                  ) : (
+                    <span>vs</span>
+                  )}
+                </div>
+                <div className="results-player">
+                  <span
+                    className={
+                      match.winner_id === match.player2_id ? "winner" : ""
+                    }
+                  >
+                    {match.player2.name}
+                  </span>
+                  <span className={`tier-badge tier-${match.player2.tier}`}>
+                    {match.player2.tier}
+                  </span>
+                </div>
+              </div>
+              <div className="results-card-meta">
+                <span className={`phase-badge ${match.phase}`}>
+                  {formatPhase(match.phase)}
+                </span>
+                {match.status === "scheduled" && (
+                  <span className="status-badge scheduled">Results</span>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
     </main>
   );
 }
 
-function getEditionOptionLabel(edition: Edition): string {
-  return edition.status === "active"
-    ? `${formatEditionLabel(edition)} (Current)`
-    : formatEditionLabel(edition);
-}
-
-function ResultCard({
-  match,
-  showArchivedLeagueTier,
-}: {
-  match: ResultItem;
-  showArchivedLeagueTier: boolean;
-}) {
-  const showTier = showArchivedLeagueTier && match.phase === "league";
-  const content = (
-    <>
-      <div className="results-card-main">
-        <div className="results-player">
-          {showTier ? (
-            <span className={`tier-badge tier-${match.player1.tier}`}>
-              {match.player1.tier}
-            </span>
-          ) : null}
-          <span
-            className={match.winner_id === match.player1_id ? "winner" : ""}
-          >
-            {match.player1.name}
-          </span>
-        </div>
-        <div className="results-vs">
-          {match.status === "completed" ? (
-            <span className="results-score">{getSetScore(match)}</span>
-          ) : (
-            <span>vs</span>
-          )}
-        </div>
-        <div className="results-player">
-          <span
-            className={match.winner_id === match.player2_id ? "winner" : ""}
-          >
-            {match.player2.name}
-          </span>
-          {showTier ? (
-            <span className={`tier-badge tier-${match.player2.tier}`}>
-              {match.player2.tier}
-            </span>
-          ) : null}
-        </div>
-      </div>
-      <div className="results-card-meta">
-        {match.phase ? (
-          <span className={`phase-badge ${match.phase}`}>
-            {formatPhase(match.phase)}
-          </span>
-        ) : (
-          <span className="phase-badge">Past Match</span>
-        )}
-        <span className="results-date">
-          {formatMatchDate(match.playedAt || match.createdAt)}
-        </span>
-        {match.status === "scheduled" && (
-          <span className="status-badge scheduled">Results</span>
-        )}
-      </div>
-    </>
-  );
-
-  if (match.href) {
-    return (
-      <Link to={match.href} className={`results-card ${match.status}`}>
-        {content}
-      </Link>
-    );
-  }
-
-  return <div className={`results-card ${match.status}`}>{content}</div>;
-}
-
-function getSetScore(match: ResultItem): string {
+function getSetScore(match: MatchWithPlayers): string {
   let p1Sets = 0;
   let p2Sets = 0;
 
@@ -491,14 +223,6 @@ function getSetScore(match: ResultItem): string {
   }
 
   return `${p1Sets} - ${p2Sets}`;
-}
-
-function formatMatchDate(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 function formatPhase(phase: string): string {

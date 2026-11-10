@@ -1,9 +1,4 @@
-import { Link, redirect, useLoaderData } from "react-router";
-import { formatEditionLabel } from "~/lib/editions";
-import {
-  getActiveEdition,
-  getEditionForRequest,
-} from "~/lib/editions.server";
+import { Link, useLoaderData } from "react-router";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
@@ -21,61 +16,40 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
-  const url = new URL(request.url);
-  const requestedEditionId = url.searchParams.get("edition");
-  const edition = await getEditionForRequest(supabase, requestedEditionId);
-
-  if (!edition) {
-    throw new Response("Edition not found", { status: 404 });
-  }
-
-  if (!requestedEditionId) {
-    const activeEdition = await getActiveEdition(supabase);
-    if (!activeEdition) {
-      throw redirect("/archive");
-    }
-  }
 
   // Get all players
-  let playersQuery = supabase.from("players").select("*");
-  if (edition.status === "active") {
-    playersQuery = playersQuery.eq("disabled", false);
-  }
-  const { data: players } = await playersQuery;
+  const { data: players } = await supabase.from("players").select("*");
 
   // Get all league matches to calculate standings
   const { data: leagueMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select(
       `
       *,
-      player1:players!edition_matches_player1_id_fkey(*),
-      player2:players!edition_matches_player2_id_fkey(*)
+      player1:players!matches_player1_id_fkey(*),
+      player2:players!matches_player2_id_fkey(*)
     `,
     )
-    .eq("edition_id", edition.id)
     .eq("phase", "league")
     .eq("status", "completed");
 
   // Check if league phase is still active (has incomplete matches)
   const { count: incompleteLeagueCount } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("*", { count: "exact", head: true })
-    .eq("edition_id", edition.id)
     .eq("phase", "league")
     .eq("status", "scheduled");
 
   // Get knockout matches
   const { data: knockoutMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select(
       `
       *,
-      player1:players!edition_matches_player1_id_fkey(*),
-      player2:players!edition_matches_player2_id_fkey(*)
+      player1:players!matches_player1_id_fkey(*),
+      player2:players!matches_player2_id_fkey(*)
     `,
     )
-    .eq("edition_id", edition.id)
     .neq("phase", "league");
 
   const standings = calculateStandings(
@@ -86,7 +60,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     standings,
-    edition,
     qualification,
     knockoutMatches: (knockoutMatches as MatchWithPlayers[]) || [],
     leagueInProgress: (incompleteLeagueCount ?? 0) > 0,
@@ -94,7 +67,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Bracket() {
-  const { standings, edition, qualification, knockoutMatches, leagueInProgress } =
+  const { standings, qualification, knockoutMatches, leagueInProgress } =
     useLoaderData<typeof loader>();
 
   // Get qualified players (top 10)
@@ -144,12 +117,6 @@ export default function Bracket() {
           Top 2 from league go directly to semifinals. 3rd-10th play knockout
           rounds.
         </p>
-        <div className="edition-context-links">
-          <span className="edition-context-label">
-            {formatEditionLabel(edition)}
-          </span>
-          <Link to="/archive">Archive</Link>
-        </div>
       </div>
 
       {leagueInProgress && (
