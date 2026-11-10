@@ -8,3 +8,8 @@
 
 # Claude
 /.claude/
+
+# Supabase backup: these contain user emails (repo is public)
+archive/pd-table-tennis-backup.zip
+archive/backup/data.sql
+archive/backup/csv/users.csv

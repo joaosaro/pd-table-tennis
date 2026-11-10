@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   data,
   Form,
@@ -7,8 +6,8 @@ import {
   useLoaderData,
   useNavigation,
 } from "react-router";
+import { useState } from "react";
 import { requireRole } from "~/lib/auth.server";
-import { rebuildEloRatings } from "~/lib/elo-sync.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { getLeagueProgress } from "~/lib/tournament.server";
 import type { Player } from "~/lib/types";
@@ -27,18 +26,17 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: players } = await supabase
     .from("players")
     .select("*")
-    .eq("disabled", false)
     .order("name");
 
   const { data: completedMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("player1_id, player2_id")
     .eq("phase", "league")
     .eq("status", "completed");
 
   const leagueProgress = getLeagueProgress(
     (players as Player[])?.length || 0,
-    completedMatches?.length || 0,
+    completedMatches?.length || 0
   );
 
   if (leagueProgress.isFinished) {
@@ -57,7 +55,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       players: (players as Player[]) || [],
       playedPairs: Array.from(playedPairs),
     },
-    { headers },
+    { headers }
   );
 }
 
@@ -81,35 +79,31 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: "Please select two different players" };
   }
 
-  const { data: players } = await supabase
-    .from("players")
-    .select("id")
-    .eq("disabled", false);
+  const { data: players } = await supabase.from("players").select("id");
   const { count: completedLeagueMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
 
   const leagueProgress = getLeagueProgress(
     players?.length || 0,
-    completedLeagueMatches || 0,
+    completedLeagueMatches || 0
   );
 
   if (leagueProgress.isFinished) {
     return {
-      error:
-        "The league stage is complete. Only open knockout matches can be submitted now.",
+      error: "The league stage is complete. Only open knockout matches can be submitted now.",
     };
   }
 
   // Check if this match already exists
   const { data: existingMatch } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("id")
     .eq("phase", "league")
     .or(
-      `and(player1_id.eq.${player1Id},player2_id.eq.${player2Id}),and(player1_id.eq.${player2Id},player2_id.eq.${player1Id})`,
+      `and(player1_id.eq.${player1Id},player2_id.eq.${player2Id}),and(player1_id.eq.${player2Id},player2_id.eq.${player1Id})`
     )
     .single();
 
@@ -151,33 +145,24 @@ export async function action({ request }: Route.ActionArgs) {
   const winnerId = p1Sets > p2Sets ? player1Id : player2Id;
 
   // Create the match with result in one step
-  const recordedAt = new Date().toISOString();
-  const { data: createdMatch, error } = await supabase
-    .from("edition_matches")
-    .insert({
-      player1_id: player1Id,
-      player2_id: player2Id,
-      phase: "league",
-      status: "completed",
-      set1_p1,
-      set1_p2,
-      set2_p1,
-      set2_p2,
-      set3_p1,
-      set3_p2,
-      winner_id: winnerId,
-      recorded_by: user.id,
-      recorded_at: recordedAt,
-    })
-    .select("*")
-    .single();
+  const { error } = await supabase.from("matches").insert({
+    player1_id: player1Id,
+    player2_id: player2Id,
+    phase: "league",
+    status: "completed",
+    set1_p1,
+    set1_p2,
+    set2_p1,
+    set2_p2,
+    set3_p1,
+    set3_p2,
+    winner_id: winnerId,
+    recorded_by: user.id,
+    recorded_at: new Date().toISOString(),
+  });
 
   if (error) {
     return { error: error.message };
-  }
-
-  if (createdMatch) {
-    await rebuildEloRatings(supabase);
   }
 
   const allHeaders = new Headers(authHeaders);
@@ -238,7 +223,7 @@ export default function RecordLeagueMatch() {
               <option value="">Select player...</option>
               {players.map((player) => (
                 <option key={player.id} value={player.id}>
-                  {player.name}
+                  {player.name} (Tier {player.tier})
                 </option>
               ))}
             </select>
@@ -261,7 +246,7 @@ export default function RecordLeagueMatch() {
               {availablePlayers2.map((player) => {
                 const ids = [player1Id, player.id].sort();
                 const alreadyPlayed = playedPairs.includes(
-                  `${ids[0]}-${ids[1]}`,
+                  `${ids[0]}-${ids[1]}`
                 );
                 return (
                   <option
@@ -269,7 +254,7 @@ export default function RecordLeagueMatch() {
                     value={player.id}
                     disabled={alreadyPlayed}
                   >
-                    {player.name}
+                    {player.name} (Tier {player.tier})
                     {alreadyPlayed ? " ✓ played" : ""}
                   </option>
                 );
@@ -282,11 +267,17 @@ export default function RecordLeagueMatch() {
           <>
             <div className="record-match-header">
               <div className="record-player">
+                <span className={`tier-badge tier-${player1.tier}`}>
+                  {player1.tier}
+                </span>
                 <span className="record-player-name">{player1.name}</span>
               </div>
               <span className="record-vs">vs</span>
               <div className="record-player">
                 <span className="record-player-name">{player2.name}</span>
+                <span className={`tier-badge tier-${player2.tier}`}>
+                  {player2.tier}
+                </span>
               </div>
             </div>
 

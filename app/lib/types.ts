@@ -10,20 +10,6 @@ export type MatchPhase =
   | "final";
 
 export type MatchStatus = "scheduled" | "completed";
-export type EditionStatus = "active" | "archived";
-export type EloMatchSourceType = "edition_match" | "manual";
-
-export interface Edition {
-  id: string;
-  name: string;
-  season: number;
-  status: EditionStatus;
-  starts_on: string | null;
-  ends_on: string | null;
-  archived_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface Player {
   id: string;
@@ -31,7 +17,6 @@ export interface Player {
   department: string | null;
   slack_handle: string | null;
   tier: 1 | 2 | 3 | 4;
-  disabled: boolean;
   disqualified_from_qualification: boolean;
   disqualification_note: string | null;
   created_at: string;
@@ -60,8 +45,6 @@ export interface TournamentSettings {
 
 export interface Match {
   id: string;
-  edition_id: string;
-  season: number;
   player1_id: string;
   player2_id: string;
   phase: MatchPhase;
@@ -87,82 +70,6 @@ export interface MatchWithPlayers extends Match {
   winner?: Player | null;
 }
 
-export interface EloMatch {
-  id: string;
-  source_type: EloMatchSourceType;
-  source_match_id: string | null;
-  season: number;
-  player1_id: string;
-  player2_id: string;
-  winner_id: string;
-  played_at: string;
-  set1_p1: number | null;
-  set1_p2: number | null;
-  set2_p1: number | null;
-  set2_p2: number | null;
-  set3_p1: number | null;
-  set3_p2: number | null;
-  notes: string | null;
-  recorded_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface EloMatchWithPlayers extends EloMatch {
-  player1: Player;
-  player2: Player;
-  winner?: Player | null;
-}
-
-export interface EloStanding {
-  player: Player;
-  rank: number;
-  rating: number;
-  rawRating: number;
-  initialRating: number;
-  matchesPlayed: number;
-  wins: number;
-  losses: number;
-  lastPlayedAt: string | null;
-}
-
-export interface PlayerEloRating {
-  player_id: string;
-  current_rating: number;
-  initial_rating: number;
-  rated_games: number;
-  wins: number;
-  losses: number;
-  last_match_id: string | null;
-  last_played_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface EloRatingHistoryEntry {
-  id: string;
-  match_id: string;
-  season: number;
-  player_id: string;
-  opponent_id: string;
-  played_at: string;
-  result_score: number;
-  expected_score: number;
-  k_factor: number;
-  rated_games_before: number;
-  rated_games_after: number;
-  rating_before: number;
-  rating_after: number;
-  rating_change: number;
-  created_at: string;
-}
-
-export interface EloRatingHistoryEntryWithPlayers extends EloRatingHistoryEntry {
-  player?: Player | null;
-  opponent?: Player | null;
-  match?: MatchWithPlayers | null;
-}
-
 // App user (simplified for UI)
 export interface AppUser {
   id: string;
@@ -171,6 +78,22 @@ export interface AppUser {
   avatarUrl: string | null;
   role: UserRole;
   playerId: string | null;
+}
+
+// Weekly recommendations
+export interface WeeklyRecommendation {
+  id: string;
+  week_date: string;
+  player1_id: string;
+  player2_id: string;
+  is_extra_match: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface WeeklyRecommendationWithPlayers extends WeeklyRecommendation {
+  player1: Player;
+  player2: Player;
 }
 
 // Standings calculation

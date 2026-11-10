@@ -1,13 +1,8 @@
 import { Link, useLoaderData } from "react-router";
 import { getUser } from "~/lib/auth.server";
-import { getDisplayRating } from "~/lib/elo";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { getLeagueProgress } from "~/lib/tournament.server";
-import type {
-  EditionStatus,
-  EloRatingHistoryEntry,
-  MatchWithPlayers,
-} from "~/lib/types";
+import type { MatchWithPlayers } from "~/lib/types";
 import { TIER_POINTS } from "~/lib/types";
 import type { Route } from "./+types/match.$id";
 
@@ -27,13 +22,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
   const { data: match } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select(
       `
       *,
-      player1:players!edition_matches_player1_id_fkey(*),
-      player2:players!edition_matches_player2_id_fkey(*)
-    `,
+      player1:players!matches_player1_id_fkey(*),
+      player2:players!matches_player2_id_fkey(*)
+    `
     )
     .eq("id", params.id)
     .single();
@@ -42,50 +37,28 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Match not found", { status: 404 });
   }
 
-  const { data: edition } = await supabase
-    .from("editions")
-    .select("status")
-    .eq("id", match.edition_id)
-    .single();
-
   const canEdit = user?.role === "admin" || user?.role === "editor";
-  const { data: players } = await supabase
-    .from("players")
-    .select("id")
-    .eq("disabled", false);
+  const { data: players } = await supabase.from("players").select("id");
   const { count: completedLeagueMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
 
   const leagueProgress = getLeagueProgress(
     players?.length || 0,
-    completedLeagueMatches || 0,
+    completedLeagueMatches || 0
   );
   const canSubmitResult =
     canEdit &&
     (!leagueProgress.isFinished ||
       (match.phase !== "league" && match.status === "scheduled"));
 
-  const { data: eloEntries } = await supabase
-    .from("elo_rating_history")
-    .select("*")
-    .eq("match_id", match.id);
-
-  return {
-    match: match as MatchWithPlayers,
-    canSubmitResult,
-    editionStatus: (edition?.status as EditionStatus | undefined) ?? "active",
-    eloEntries: (eloEntries as EloRatingHistoryEntry[]) || [],
-  };
+  return { match: match as MatchWithPlayers, canSubmitResult };
 }
 
 export default function MatchDetails() {
-  const { match, canSubmitResult, editionStatus, eloEntries } =
-    useLoaderData<typeof loader>();
-  const showArchivedLeagueTier =
-    editionStatus === "archived" && match.phase === "league";
+  const { match, canSubmitResult } = useLoaderData<typeof loader>();
 
   const sets = [
     { num: 1, p1: match.set1_p1, p2: match.set1_p2 },
@@ -102,12 +75,6 @@ export default function MatchDetails() {
     match.winner_id === match.player1_id ? match.player2 : match.player1;
   const pointsEarned =
     match.status === "completed" ? TIER_POINTS[loser.tier as 1 | 2 | 3 | 4] : 0;
-  const player1Elo = eloEntries.find(
-    (entry) => entry.player_id === match.player1_id,
-  );
-  const player2Elo = eloEntries.find(
-    (entry) => entry.player_id === match.player2_id,
-  );
 
   return (
     <main className="page">
@@ -120,7 +87,10 @@ export default function MatchDetails() {
             <span className="status-badge scheduled">Scheduled</span>
           )}
           {canSubmitResult && (
-            <Link to={`/editor/record/${match.id}`} className="btn btn-primary">
+            <Link
+              to={`/editor/record/${match.id}`}
+              className="btn btn-primary"
+            >
               {match.status === "scheduled" ? "Record Result" : "Edit Result"}
             </Link>
           )}
@@ -137,16 +107,10 @@ export default function MatchDetails() {
             <div className="match-player-info">
               <span className="match-player-name">{match.player1.name}</span>
               <span className="match-player-tier">
-                {showArchivedLeagueTier ? (
-                  <span className={`tier-badge tier-${match.player1.tier}`}>
-                    {match.player1.tier}
-                  </span>
-                ) : null}
-                {match.player1.department
-                  ? showArchivedLeagueTier
-                    ? ` • ${match.player1.department}`
-                    : match.player1.department
-                  : null}
+                <span className={`tier-badge tier-${match.player1.tier}`}>
+                  {match.player1.tier}
+                </span>
+                {match.player1.department && ` • ${match.player1.department}`}
               </span>
             </div>
             {match.status === "completed" && (
@@ -168,16 +132,10 @@ export default function MatchDetails() {
             <div className="match-player-info right">
               <span className="match-player-name">{match.player2.name}</span>
               <span className="match-player-tier">
-                {match.player2.department
-                  ? showArchivedLeagueTier
-                    ? `${match.player2.department} • `
-                    : match.player2.department
-                  : null}
-                {showArchivedLeagueTier ? (
-                  <span className={`tier-badge tier-${match.player2.tier}`}>
-                    {match.player2.tier}
-                  </span>
-                ) : null}
+                {match.player2.department && `${match.player2.department} • `}
+                <span className={`tier-badge tier-${match.player2.tier}`}>
+                  {match.player2.tier}
+                </span>
               </span>
             </div>
             <div className="match-player-avatar">
@@ -213,8 +171,8 @@ export default function MatchDetails() {
             {match.phase === "league" ? (
               <p>
                 <strong>{winner.name}</strong> won and earned{" "}
-                <strong>{pointsEarned} points</strong>
-                {showArchivedLeagueTier ? ` (opponent tier ${loser.tier})` : ""}
+                <strong>{pointsEarned} points</strong> (opponent tier{" "}
+                {loser.tier})
               </p>
             ) : (
               <p>
@@ -227,18 +185,6 @@ export default function MatchDetails() {
           </div>
         )}
 
-        {match.status === "completed" && player1Elo && player2Elo ? (
-          <div className="match-summary">
-            <p>
-              Elo: {match.player1.name}{" "}
-              {formatRatingChange(player1Elo.rating_change)} to{" "}
-              {getDisplayRating(player1Elo.rating_after)} • {match.player2.name}{" "}
-              {formatRatingChange(player2Elo.rating_change)} to{" "}
-              {getDisplayRating(player2Elo.rating_after)}
-            </p>
-          </div>
-        ) : null}
-
         {match.recorded_at && (
           <div className="match-recorded">
             Recorded {new Date(match.recorded_at).toLocaleDateString()}
@@ -247,11 +193,6 @@ export default function MatchDetails() {
       </div>
     </main>
   );
-}
-
-function formatRatingChange(change: number) {
-  const rounded = Math.round(change);
-  return rounded > 0 ? `+${rounded}` : `${rounded}`;
 }
 
 function formatPhase(phase: string): string {

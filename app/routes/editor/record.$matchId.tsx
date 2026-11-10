@@ -7,12 +7,11 @@ import {
   useNavigation,
 } from "react-router";
 import { requireRole } from "~/lib/auth.server";
-import { rebuildEloRatings } from "~/lib/elo-sync.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import {
   calculateStandings,
-  getKnockoutRoundUpdates,
   getLeagueProgress,
+  getKnockoutRoundUpdates,
 } from "~/lib/tournament.server";
 import type { Match, MatchWithPlayers, Player } from "~/lib/types";
 import type { Route } from "./+types/record.$matchId";
@@ -34,13 +33,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createSupabaseServerClient(request);
 
   const { data: match } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select(
       `
       *,
-      player1:players!edition_matches_player1_id_fkey(*),
-      player2:players!edition_matches_player2_id_fkey(*)
-    `,
+      player1:players!matches_player1_id_fkey(*),
+      player2:players!matches_player2_id_fkey(*)
+    `
     )
     .eq("id", params.matchId)
     .single();
@@ -49,19 +48,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response("Match not found", { status: 404 });
   }
 
-  const { data: players } = await supabase
-    .from("players")
-    .select("id")
-    .eq("disabled", false);
+  const { data: players } = await supabase.from("players").select("id");
   const { count: completedLeagueMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
 
   const leagueProgress = getLeagueProgress(
     players?.length || 0,
-    completedLeagueMatches || 0,
+    completedLeagueMatches || 0
   );
 
   if (leagueProgress.isFinished && match.phase === "league") {
@@ -113,7 +109,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   // Get the match to determine winner and phase
   const { data: match } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("player1_id, player2_id, phase, status")
     .eq("id", params.matchId)
     .single();
@@ -122,19 +118,16 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: "Match not found" };
   }
 
-  const { data: players } = await supabase
-    .from("players")
-    .select("id")
-    .eq("disabled", false);
+  const { data: players } = await supabase.from("players").select("id");
   const { count: completedLeagueMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
 
   const leagueProgress = getLeagueProgress(
     players?.length || 0,
-    completedLeagueMatches || 0,
+    completedLeagueMatches || 0
   );
 
   if (leagueProgress.isFinished && match.phase === "league") {
@@ -144,10 +137,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   const winnerId = p1Sets > p2Sets ? match.player1_id : match.player2_id;
-  const recordedAt = new Date().toISOString();
 
-  const { data: updatedMatch, error } = await supabase
-    .from("edition_matches")
+  const { error } = await supabase
+    .from("matches")
     .update({
       set1_p1,
       set1_p2,
@@ -158,25 +150,19 @@ export async function action({ request, params }: Route.ActionArgs) {
       winner_id: winnerId,
       status: "completed",
       recorded_by: user.id,
-      recorded_at: recordedAt,
+      recorded_at: new Date().toISOString(),
     })
-    .eq("id", params.matchId)
-    .select("*")
-    .single();
+    .eq("id", params.matchId);
 
   if (error) {
     return { error: error.message };
-  }
-
-  if (updatedMatch) {
-    await rebuildEloRatings(supabase);
   }
 
   // Check if this was a knockout match and generate next round if needed
   if (match.phase !== "league") {
     // Get all knockout matches to check progression
     const { data: knockoutMatches } = await supabase
-      .from("edition_matches")
+      .from("matches")
       .select("*")
       .neq("phase", "league");
 
@@ -184,41 +170,38 @@ export async function action({ request, params }: Route.ActionArgs) {
     const updatedKnockoutMatches = (knockoutMatches || []).map((m) =>
       m.id === params.matchId
         ? { ...m, status: "completed", winner_id: winnerId }
-        : m,
+        : m
     );
 
     // Get standings for seeding
-    const { data: players } = await supabase
-      .from("players")
-      .select("*")
-      .eq("disabled", false);
+    const { data: players } = await supabase.from("players").select("*");
     const { data: leagueMatches } = await supabase
-      .from("edition_matches")
+      .from("matches")
       .select(
         `
         *,
-        player1:players!edition_matches_player1_id_fkey(*),
-        player2:players!edition_matches_player2_id_fkey(*)
-      `,
+        player1:players!matches_player1_id_fkey(*),
+        player2:players!matches_player2_id_fkey(*)
+      `
       )
       .eq("phase", "league")
       .eq("status", "completed");
 
     const standings = calculateStandings(
       (players as Player[]) || [],
-      (leagueMatches as MatchWithPlayers[]) || [],
+      (leagueMatches as MatchWithPlayers[]) || []
     );
 
     // Check if we need to create or update next round matches
     const roundUpdates = getKnockoutRoundUpdates(
       updatedKnockoutMatches as Match[],
-      standings,
+      standings
     );
 
     // Delete stale scheduled matches first
     if (roundUpdates.deletes.length > 0) {
       const { error: deleteError } = await supabase
-        .from("edition_matches")
+        .from("matches")
         .delete()
         .in("id", roundUpdates.deletes);
 
@@ -230,7 +213,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Insert new/updated matches
     if (roundUpdates.inserts.length > 0) {
       const { error: insertError } = await supabase
-        .from("edition_matches")
+        .from("matches")
         .insert(roundUpdates.inserts);
 
       if (insertError) {
@@ -256,11 +239,17 @@ export default function RecordMatch() {
 
       <div className="record-match-header">
         <div className="record-player">
+          <span className={`tier-badge tier-${match.player1.tier}`}>
+            {match.player1.tier}
+          </span>
           <span className="record-player-name">{match.player1.name}</span>
         </div>
         <span className="record-vs">vs</span>
         <div className="record-player">
           <span className="record-player-name">{match.player2.name}</span>
+          <span className={`tier-badge tier-${match.player2.tier}`}>
+            {match.player2.tier}
+          </span>
         </div>
       </div>
 

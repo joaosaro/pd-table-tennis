@@ -25,22 +25,21 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: players } = await supabase
     .from("players")
     .select("*")
-    .eq("disabled", false)
     .order("name", { ascending: true });
 
   const { count: completedLeagueMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("*", { count: "exact", head: true })
     .eq("phase", "league")
     .eq("status", "completed");
 
   let query = supabase
-    .from("edition_matches")
+    .from("matches")
     .select(
       `
         *,
-        player1:players!edition_matches_player1_id_fkey(*),
-        player2:players!edition_matches_player2_id_fkey(*)
+        player1:players!matches_player1_id_fkey(*),
+        player2:players!matches_player2_id_fkey(*)
       `,
     )
     .order("phase")
@@ -64,12 +63,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const knockoutMatches = allMatches.filter((m) => m.phase !== "league");
   if (knockoutMatches.length > 0) {
     const { data: leagueMatches } = await supabase
-      .from("edition_matches")
+      .from("matches")
       .select(
         `
           *,
-          player1:players!edition_matches_player1_id_fkey(*),
-          player2:players!edition_matches_player2_id_fkey(*)
+          player1:players!matches_player1_id_fkey(*),
+          player2:players!matches_player2_id_fkey(*)
         `,
       )
       .eq("phase", "league")
@@ -82,20 +81,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     const updates = getKnockoutRoundUpdates(knockoutMatches as Match[], standings);
 
     if (updates.deletes.length > 0) {
-      await supabase.from("edition_matches").delete().in("id", updates.deletes);
+      await supabase.from("matches").delete().in("id", updates.deletes);
     }
     if (updates.inserts.length > 0) {
-      await supabase.from("edition_matches").insert(updates.inserts);
+      await supabase.from("matches").insert(updates.inserts);
     }
 
     if (updates.deletes.length > 0 || updates.inserts.length > 0) {
       let refreshedQuery = supabase
-        .from("edition_matches")
+        .from("matches")
         .select(
           `
             *,
-            player1:players!edition_matches_player1_id_fkey(*),
-            player2:players!edition_matches_player2_id_fkey(*)
+            player1:players!matches_player1_id_fkey(*),
+            player2:players!matches_player2_id_fkey(*)
           `,
         )
         .order("phase")
@@ -218,6 +217,9 @@ export default function EditorMatches() {
               <div key={match.id} className="results-card scheduled">
                 <div className="results-card-main">
                   <div className="results-player">
+                    <span className={`tier-badge tier-${match.player1.tier}`}>
+                      {match.player1.tier}
+                    </span>
                     <span>{match.player1.name}</span>
                   </div>
                   <div className="results-vs">
@@ -225,6 +227,9 @@ export default function EditorMatches() {
                   </div>
                   <div className="results-player">
                     <span>{match.player2.name}</span>
+                    <span className={`tier-badge tier-${match.player2.tier}`}>
+                      {match.player2.tier}
+                    </span>
                   </div>
                 </div>
                 <div className="results-card-actions">
@@ -254,6 +259,9 @@ export default function EditorMatches() {
               <div key={match.id} className="results-card completed">
                 <div className="results-card-main">
                   <div className="results-player">
+                    <span className={`tier-badge tier-${match.player1.tier}`}>
+                      {match.player1.tier}
+                    </span>
                     <span
                       className={
                         match.winner_id === match.player1_id ? "winner" : ""
@@ -272,6 +280,9 @@ export default function EditorMatches() {
                       }
                     >
                       {match.player2.name}
+                    </span>
+                    <span className={`tier-badge tier-${match.player2.tier}`}>
+                      {match.player2.tier}
                     </span>
                   </div>
                 </div>

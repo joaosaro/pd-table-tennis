@@ -17,11 +17,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*", { count: "exact", head: true });
 
   const { count: totalMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("*", { count: "exact", head: true });
 
   const { count: completedMatches } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select("*", { count: "exact", head: true })
     .eq("status", "completed");
 
@@ -78,9 +78,17 @@ export default function AdminIndex() {
             <h3>Generate Matches</h3>
             <p>Create league or knockout matches</p>
           </Link>
+          <Link to="/admin/tiers" className="action-card">
+            <h3>Assign Tiers</h3>
+            <p>Set player skill tiers</p>
+          </Link>
           <Link to="/admin/users" className="action-card">
             <h3>Manage Users</h3>
             <p>Assign roles to users</p>
+          </Link>
+          <Link to="/admin/recommendations" className="action-card">
+            <h3>Match Suggestions</h3>
+            <p>Generate weekly match recommendations</p>
           </Link>
         </div>
       </div>

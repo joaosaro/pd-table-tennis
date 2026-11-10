@@ -9,7 +9,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Fetch all completed matches with player details
   const { data: matches, error } = await supabase
-    .from("edition_matches")
+    .from("matches")
     .select(
       `
       id,
@@ -23,8 +23,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       set3_p2,
       winner_id,
       recorded_at,
-      player1:players!edition_matches_player1_id_fkey(id, name, department),
-      player2:players!edition_matches_player2_id_fkey(id, name, department)
+      player1:players!matches_player1_id_fkey(id, name, department, tier),
+      player2:players!matches_player2_id_fkey(id, name, department, tier)
     `
     )
     .eq("status", "completed")
@@ -40,8 +40,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     "Phase",
     "Player 1",
     "Player 1 Department",
+    "Player 1 Tier",
     "Player 2",
     "Player 2 Department",
+    "Player 2 Tier",
     "Set 1",
     "Set 2",
     "Set 3",
@@ -50,16 +52,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   ];
 
   const rows = matches.map((match) => {
-    const player1 = match.player1 as unknown as {
-      id: string;
-      name: string;
-      department: string | null;
-    };
-    const player2 = match.player2 as unknown as {
-      id: string;
-      name: string;
-      department: string | null;
-    };
+    const player1 = match.player1 as unknown as { id: string; name: string; department: string | null; tier: number };
+    const player2 = match.player2 as unknown as { id: string; name: string; department: string | null; tier: number };
     const winner = match.winner_id === player1.id ? player1.name : player2.name;
 
     const set1 = match.set1_p1 !== null ? `${match.set1_p1}-${match.set1_p2}` : "";
@@ -71,8 +65,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       formatPhase(match.phase),
       player1.name,
       player1.department || "",
+      player1.tier,
       player2.name,
       player2.department || "",
+      player2.tier,
       set1,
       set2,
       set3,

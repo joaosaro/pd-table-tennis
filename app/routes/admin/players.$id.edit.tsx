@@ -40,18 +40,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { supabase, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
-  const { data: existingPlayer } = await supabase
-    .from("players")
-    .select("tier")
-    .eq("id", params.id)
-    .single();
 
   const name = (formData.get("name") as string)?.trim();
   const department = (formData.get("department") as string)?.trim() || null;
   const slackHandleRaw = (formData.get("slack_handle") as string) || "";
   const slack_handle = normalizeSlackHandle(slackHandleRaw);
-  const tier = existingPlayer?.tier ?? 4;
-  const disabled = formData.get("disabled") === "on";
+  const tier = parseInt(formData.get("tier") as string) || 4;
   const disqualifiedFromQualification =
     formData.get("disqualified_from_qualification") === "on";
   const disqualificationNote =
@@ -74,7 +68,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       department,
       slack_handle,
       tier,
-      disabled,
       disqualified_from_qualification: disqualifiedFromQualification,
       disqualification_note: disqualifiedFromQualification
         ? disqualificationNote
@@ -151,16 +144,21 @@ export default function AdminPlayersEdit() {
         </div>
 
         <div className="form-group">
-          <label className="form-label" htmlFor="disabled">
-            <input
-              type="checkbox"
-              id="disabled"
-              name="disabled"
-              defaultChecked={player.disabled}
-              disabled={isSubmitting}
-            />{" "}
-            Disabled (left Pipedrive)
+          <label htmlFor="tier" className="form-label">
+            Tier
           </label>
+          <select
+            id="tier"
+            name="tier"
+            className="form-select"
+            defaultValue={player.tier}
+            disabled={isSubmitting}
+          >
+            <option value="1">Tier 1 (Hardest - 4 pts)</option>
+            <option value="2">Tier 2 (3 pts)</option>
+            <option value="3">Tier 3 (2 pts)</option>
+            <option value="4">Tier 4 (Easiest - 1 pt)</option>
+          </select>
         </div>
 
         <div className="form-group">

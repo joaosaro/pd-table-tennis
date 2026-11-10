@@ -1,14 +1,7 @@
-import {
-  data,
-  Form,
-  redirect,
-  useActionData,
-  useNavigation,
-} from "react-router";
-import { requireRole } from "~/lib/auth.server";
-import { rebuildEloRatings } from "~/lib/elo-sync.server";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { Form, redirect, useActionData, useNavigation, data } from "react-router";
 import type { Route } from "./+types/players.new";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { requireRole } from "~/lib/auth.server";
 
 export function meta() {
   return [{ title: "Add Player | PD Table Tennis" }];
@@ -29,7 +22,7 @@ export async function action({ request }: Route.ActionArgs) {
   const department = (formData.get("department") as string)?.trim() || null;
   const slackHandleRaw = (formData.get("slack_handle") as string) || "";
   const slack_handle = normalizeSlackHandle(slackHandleRaw);
-  const disabled = formData.get("disabled") === "on";
+  const tier = parseInt(formData.get("tier") as string) || 4;
 
   if (!name) {
     return { error: "Name is required" };
@@ -39,15 +32,12 @@ export async function action({ request }: Route.ActionArgs) {
     name,
     department,
     slack_handle,
-    tier: 4,
-    disabled,
+    tier,
   });
 
   if (error) {
     return { error: error.message };
   }
-
-  await rebuildEloRatings(supabase);
 
   const allHeaders = new Headers(authHeaders);
   headers.forEach((value, key) => allHeaders.append(key, value));
@@ -110,15 +100,21 @@ export default function AdminPlayersNew() {
         </div>
 
         <div className="form-group">
-          <label className="form-label" htmlFor="disabled">
-            <input
-              type="checkbox"
-              id="disabled"
-              name="disabled"
-              disabled={isSubmitting}
-            />{" "}
-            Disabled (left Pipedrive)
+          <label htmlFor="tier" className="form-label">
+            Tier
           </label>
+          <select
+            id="tier"
+            name="tier"
+            className="form-select"
+            defaultValue="4"
+            disabled={isSubmitting}
+          >
+            <option value="1">Tier 1 (Hardest - 4 pts)</option>
+            <option value="2">Tier 2 (3 pts)</option>
+            <option value="3">Tier 3 (2 pts)</option>
+            <option value="4">Tier 4 (Easiest - 1 pt)</option>
+          </select>
         </div>
 
         <div className="form-actions">

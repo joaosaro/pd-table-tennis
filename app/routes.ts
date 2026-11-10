@@ -3,16 +3,13 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 export default [
   // Public routes
   index("routes/home.tsx"),
-  route("leaderboard", "routes/leaderboard.tsx"),
-  route("elo", "routes/elo.tsx"),
-  route("elo/dry-run", "routes/elo.dry-run.tsx"),
-  route("archive", "routes/archive.tsx"),
   route("standings", "routes/standings.tsx"),
   route("results", "routes/results.tsx"),
   route("players", "routes/players.tsx"),
   route("player/:id", "routes/player.$id.tsx"),
   route("match/:id", "routes/match.$id.tsx"),
   route("bracket", "routes/bracket.tsx"),
+  route("recommendations", "routes/recommendations.tsx"),
 
   // Auth routes
   route("login", "routes/auth/login.tsx"),
@@ -29,9 +26,11 @@ export default [
   route("admin/players", "routes/admin/players.tsx"),
   route("admin/players/new", "routes/admin/players.new.tsx"),
   route("admin/players/:id/edit", "routes/admin/players.$id.edit.tsx"),
+  route("admin/tiers", "routes/admin/tiers.tsx"),
   route("admin/matches", "routes/admin/matches.tsx"),
   route("admin/generate", "routes/admin/generate.tsx"),
   route("admin/settings", "routes/admin/settings.tsx"),
   route("admin/users", "routes/admin/users.tsx"),
   route("admin/export-results", "routes/admin/export-results.tsx"),
+  route("admin/recommendations", "routes/admin/recommendations.tsx"),
 ] satisfies RouteConfig;
